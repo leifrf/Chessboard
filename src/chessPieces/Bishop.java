@@ -16,5 +16,5 @@ public class Bishop extends ChessPiece{
 			icon = new ImageIcon("ChessPieceImages/bishop_black.png");
 		return icon;
 	}
-
+	
 }

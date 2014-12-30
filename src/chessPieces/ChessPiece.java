@@ -6,7 +6,7 @@ import javax.swing.ImageIcon;
 // Downside: Makes it downward linking
 // Upside: Consolidates code
 
-public abstract class ChessPiece {
+public class ChessPiece implements Cloneable{
 
 	public static final int WHITE = -1;
 	public static final int BLACK = -2;
@@ -16,6 +16,7 @@ public abstract class ChessPiece {
 	private ImageIcon icon;
 	private String name;
 	
+	@SuppressWarnings("unused")
 	private ChessPiece(){};
 	
 	public ChessPiece(int value, ImageIcon icon, String name, int side){
@@ -33,12 +34,16 @@ public abstract class ChessPiece {
 		return icon;
 	}
 	
+	public int getSide(){
+		return side;
+	}
+	
 	public String toString(){
 		return name;
 	}
 	
-	public int getSide(){
-		return side;
+	public Object clone(){
+		return new ChessPiece(value, icon, name, side);
 	}
 	
 }
