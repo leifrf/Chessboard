@@ -23,31 +23,28 @@ public class Chessboard extends JPanel implements Cloneable{
 	private static final long serialVersionUID = 1L;
 
 	private Square[][] grid = new Square[8][8];
+	
 	private Color selectColor = Color.red;
 	private Color availableColor = Color.orange;
 	private Color checkColor = Color.magenta;
+	
 	private Square selection;
 	private ArrayList<Square> selectionMoves = new ArrayList<Square>();
 	
-	private ArrayList<Square> blackPieces = new ArrayList<Square>();
-	private ArrayList<Square> whitePieces = new ArrayList<Square>();
-	// Not sure if this is really necessary
-
 	private boolean whiteTurn = true;
 	
+	SquareListener listener = new SquareListener();
 	
 	public static void main(String[] args){
 		JFrame frame = new JFrame();
 		Chessboard board = new Chessboard();
 		frame.setTitle("Chessboard");
 		frame.add(board);
-		
 		frame.setVisible(true);
 		frame.setSize(800,800);
 		frame.setMinimumSize(new Dimension(600, 600));
 		frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
 		frame.setLocationRelativeTo(null);
-		
 	}
 	
 	public Chessboard(){
@@ -60,15 +57,12 @@ public class Chessboard extends JPanel implements Cloneable{
 		
 		initializeSide(ChessPiece.WHITE);
 		initializeSide(ChessPiece.BLACK);
-		
-		scanBoard();
 	}
 	
 	private void initializeBoard(Color color1, Color color2){
 		int size = grid.length;
 		GridLayout layout = new GridLayout(size, size);
 		this.setLayout(layout);
-//		grid = new Square[size][size];
 		Color currentColor = color1;
 		for (int row = 0; row < size; row++){
 			for (int column = 0; column < size; column++){
@@ -77,7 +71,6 @@ public class Chessboard extends JPanel implements Cloneable{
 				else
 					currentColor = color2;
 				grid[row][column] = new Square(currentColor, row, column);
-				SquareListener listener = new SquareListener();
 				grid[row][column].addActionListener(listener);
 				this.add(grid[row][column]);
 			}
@@ -99,23 +92,6 @@ public class Chessboard extends JPanel implements Cloneable{
 		grid[boardSide][5].setPiece(new Bishop(side));
 		grid[boardSide][3].setPiece(new Queen(side));
 		grid[boardSide][4].setPiece(new King(side));
-	}
-	
-	// Really inefficient way of updating sides
-	private void scanBoard(){
-		whitePieces.clear();
-		blackPieces.clear();
-		for (int row = 0; row < 8; row ++){
-			for (int column = 0; column < 8; column++){
-				ChessPiece piece = grid[row][column].getPiece();
-				if (piece != null){
-					if (piece.getSide() == ChessPiece.WHITE)
-						whitePieces.add(grid[row][column]);
-					else
-						blackPieces.add(grid[row][column]);
-				}
-			}
-		}
 	}
 
 	private class Position{
@@ -164,7 +140,7 @@ public class Chessboard extends JPanel implements Cloneable{
 				super.setIcon(null);
 			}
 			else {
-				super.setIcon(piece.getIcon());
+				super.setIcon(this.piece.getIcon());
 			}
 		}
 		
@@ -287,9 +263,7 @@ public class Chessboard extends JPanel implements Cloneable{
 					grid[row + shift][column - shift].getPiece() != null &&
 					grid[row + shift][column - shift].getPiece().getSide() != piece.getSide())
 				moves.add(new Position(row + shift, column - shift));
-
 			return moves;
-				
 		}
 		private ArrayList<Position> getMovesKing(){
 			ArrayList<Position> moves = new ArrayList<Position>();
@@ -366,24 +340,46 @@ public class Chessboard extends JPanel implements Cloneable{
 			else if(selectionMoves.contains(square)){
 				movePiece(selection, square);
 				deselectSquare(selection);
-				scanBoard();
+				
+				if (whiteTurn){
+					if(victory(ChessPiece.WHITE))
+						System.out.println("White wins.");
+				}
+				else
+					if(victory(ChessPiece.BLACK))
+						System.out.println("Black wins.");
+				
 				whiteTurn = !whiteTurn;
 			}
-//			testCheck(ChessPiece.WHITE);
-//			testCheck(ChessPiece.BLACK);
 		}
 		
 	}
 	
-	protected void selectSquare(Square square){
+	private boolean victory(int side){
+
+//		System.out.println("in victory.");
+		
+		int otherSide;
+		if (side == ChessPiece.WHITE)
+			otherSide = ChessPiece.BLACK;
+		else
+			otherSide = ChessPiece.WHITE;
+			
+		if (testCheck(otherSide)){
+//			System.out.println("check detected.");
+			return testCheckMate(otherSide);
+		}
+		return false;
+//		return testCheck(side) && testCheckMate(side);
+	}
+	
+	private void selectSquare(Square square){
 		selection = square;
 		for (Position p : square.getMoves()){
-			if (testMove(grid[p.row][p.column])){
+			if (testMove(square, grid[p.row][p.column])){
 				selectionMoves.add(grid[p.row][p.column]);
 				grid[p.row][p.column].setBackground(availableColor);
 			}
-			else
-				System.out.println("Move filtered.");
 		}
 		if (selectionMoves.size() != 0){
 			square.setBackground(selectColor);
@@ -405,85 +401,196 @@ public class Chessboard extends JPanel implements Cloneable{
 		origin.setPiece(null);
 	}
 
-	public boolean testCheck(int side){
-		ArrayList<Square> positions;
-		Position kingPosition = null;
-		boolean checkDetected = false;
-		// Getting positions & kingPosition
-		if (side == ChessPiece.BLACK){
-			System.out.println("Testing black side.");
-			for (Square s : blackPieces){
-				if (s.getPiece() instanceof King){
-					kingPosition = new Position(s.row, s.column);
-					break;
-				}
-			}
-			positions = whitePieces;
-		}
-		else{
-			System.out.println("Testing white side.");
-			for (Square s : whitePieces){
-				if (s.getPiece() instanceof King){
-					kingPosition = new Position(s.row, s.column);
-					break;
-				}
-			}
-			positions = blackPieces;
-		} // Done getting positions
-		
-		// Finding checks
-		System.out.println("King at: " + kingPosition);
-		for (Square s : positions){
-//			if(s.getPiece() instanceof Queen)
-//				System.out.println("Testing piece " + s.getPiece() + " at " + s.row + ", " + s.column);
-//			System.out.println("Finding checks");
-			for (Position m : s.getMoves()){
-//				if(s.getPiece() instanceof Queen)
-//					System.out.println("Queen accesses square " + m + " King at " + kingPosition);
-				if (m.row == kingPosition.row && m.column == kingPosition.column){
-					s.setBackground(checkColor);
-					checkDetected = true;
-					System.out.println("Check detected.");
-					break;
-				}
-			}
-		}
-		return checkDetected;
-	}
-
-	public boolean testCheckMate(int side){
-		return false;
+	private boolean isValid(int row, int column){
+		return row < 8 && column < 8 && row > -1 && column > -1;
 	}
 	
-	//returns true if move is valid
-	private boolean testMove(Square square){
-		System.out.println("Testing square: " + square);
-		Square backupSquare1 = (Square)selection.clone();
-		Square backupSquare2 = (Square)square.clone();
+	/**
+	 * RETURNS TRUE IF IN CHECKMATE 
+	 * 
+	 * @param side
+	 * @return
+	 */
+	private boolean testCheckMate(int side){
+		
+		boolean inCheckMate = true;
+		
+		ArrayList<Square> pieces = new ArrayList<Square>();
+		for (Square[] squares : grid){
+			for (Square s : squares){
+				if (s.getPiece() != null && s.getPiece().getSide() == side)
+					pieces.add(s);
+			}
+		}
+
+		for (Square s : pieces){
+			for (Position p : s.getMoves()){
+				if (testMove(s, grid[p.row][p.column])){
+					// This is where I would grab the squares for highlight options for moving out of check
+//					System.out.println("Valid move: " + s + " to " + grid[p.row][p.column]);
+					inCheckMate = false;
+				}
+			}
+		}
+		
+		return inCheckMate;
+		
+	}
+	
+	/**
+	 * RETURNS TRUE IF IN CHECK
+	 * 
+	 * @param side
+	 * @return true if in check
+	 */
+	private boolean testCheck(int side){
+//		System.out.println("Testing check.");
+		Square kingPosition = null;
+		for (int row = 0; row < 8; row++){
+			for (int column = 0; column < 8; column++){
+				if (grid[row][column].getPiece() != null &&
+						grid[row][column].getPiece() instanceof King &&	
+						grid[row][column].getPiece().getSide() == side){
+					kingPosition = grid[row][column];
+					break;
+				}
+			}
+		}
+//		System.out.println("King found in testCheck.");
+		
+		return checkKnight(kingPosition) | checkPawn(kingPosition) | checkLines(kingPosition);
+	}
+	private boolean checkKnight(Square kingPosition){
+		
+//		System.out.println("in checkKnight.");
+		
+		boolean inCheck = false;
+		
+		int row = kingPosition.row;
+		int column = kingPosition.column;
+		ChessPiece piece = kingPosition.getPiece();
+		
+		ArrayList<int[]> moves = new ArrayList<int[]>();
+		moves.add(new int[]{1, 2});
+		moves.add(new int[]{1, -2});
+		moves.add(new int[]{-1, 2});
+		moves.add(new int[]{-1, -2});
+		moves.add(new int[]{2, 1});
+		moves.add(new int[]{2, -1});
+		moves.add(new int[]{-2, 1});
+		moves.add(new int[]{-2, -1});
+		
+		ArrayList<Position> positions = new ArrayList<Position>();
+		for (int[] move : moves){
+			if(isValid(row + move[0], column + move[1]))
+				positions.add(new Position(row + move[0], column + move[1]));
+		}
+		for (int i = 0; i < positions.size(); i++){
+			Position p = positions.get(i);
+			if (grid[p.row][p.column].getPiece() != null &&
+					grid[p.row][p.column].getPiece() instanceof Knight &&
+					grid[p.row][p.column].getPiece().getSide() != piece.getSide()){
+				inCheck = true;
+				grid[p.row][p.column].setBackground(checkColor);
+			}
+		}
+		
+		return inCheck;
+	}
+	private boolean checkPawn (Square kingPosition){
+		
+//		System.out.println("in checkPawn");
+		
+		int side = kingPosition.getPiece().getSide();
+		int adjust;
+		// Getting direction
+		if (side == ChessPiece.WHITE)
+			adjust = -1;
+		else
+			adjust = 1;
+		
+		ChessPiece piece1 = null;
+		if (isValid(kingPosition.row + adjust, kingPosition.column + adjust))
+			piece1 = grid[kingPosition.row + adjust][kingPosition.column + adjust].getPiece();
+		ChessPiece piece2 = null; 
+		if (isValid(kingPosition.row + adjust, kingPosition.column - adjust))
+			piece2 = grid[kingPosition.row + adjust][kingPosition.column - adjust].getPiece();
+		
+		boolean inCheck = false;
+		
+		if (piece1 instanceof Pawn && piece1.getSide() != side){
+			grid[kingPosition.row + adjust][kingPosition.column + adjust].setBackground(checkColor);
+			inCheck = true;
+		}
+		if (piece2 instanceof Pawn && piece2.getSide() != side){
+			grid[kingPosition.row + adjust][kingPosition.column - adjust].setBackground(checkColor);
+			inCheck = true;
+		}
+		
+		return inCheck;
+	}
+	private boolean checkLines(Square kingPosition){
+		
+//		System.out.println("in checKLines.");
+		
+		boolean inCheck = false;
+		
+		int row = kingPosition.row;
+		int column = kingPosition.column;
+		//Only meant to be used with the king position
+		King piece = (King)kingPosition.getPiece();
+		
+		Square conflictSquare = null;
+		
+		int[][] diagonals = new int[][]{new int[]{1, 1}, new int[]{1, -1}, new int[]{-1, 1}, new int[]{-1, -1}};
+		int[][] rows = 		new int[][]{new int[]{1, 0}, new int[]{-1, 0}, new int[]{0, -1}, new int[]{0, 1}};
+		//Diagonals
+		for (int[] diag : diagonals){
+			conflictSquare = checkRecursive(row, column, diag[0], diag[1]);
+			if (conflictSquare != null &&
+				conflictSquare.getPiece().getSide() != piece.getSide() && 
+				(conflictSquare.getPiece() instanceof Queen || conflictSquare.getPiece() instanceof Bishop)){
+				conflictSquare.setBackground(checkColor);
+				inCheck = true;
+			}
+		}
+		//Rows & Columns
+		for (int[] ro : rows){
+			conflictSquare = checkRecursive(row, column, ro[0], ro[1]);
+			if (conflictSquare != null && 
+				conflictSquare.getPiece().getSide() != piece.getSide() &&
+				(conflictSquare.getPiece() instanceof Rook || conflictSquare.getPiece() instanceof Queen)){
+				conflictSquare.setBackground(checkColor);
+				inCheck = true;
+			}
+		}
+		
+		return inCheck;
+	}
+	private Square checkRecursive(int row, int column, int rowAdjust, int columnAdjust){
+		
+		Square square = null;
+		
+		int currentRow = row + rowAdjust;
+		int currentColumn = column + columnAdjust;
+		if(isValid(currentRow, currentColumn)){
+			if(grid[currentRow][currentColumn].getPiece() == null)
+				square = checkRecursive(currentRow, currentColumn, rowAdjust, columnAdjust);
+			else
+				square = grid[currentRow][currentColumn];
+		}
+		return square;
+	}
+
+	private boolean testMove(Square origin, Square target){
 		boolean validity = true;
 		
 		Chessboard checkBoard = (Chessboard)this.clone();
-		System.out.println("Board cloned in testMove.");
-		checkBoard.movePiece(checkBoard.grid[backupSquare1.row][backupSquare1.column], checkBoard.grid[backupSquare2.row][backupSquare2.column]);
-		System.out.println(checkBoard);
-		if (whiteTurn){
-//			System.out.println("In here");
-//			System.out.println(checkBoard);
-//			System.out.println(checkBoard.whitePieces.size());
-			if (checkBoard.testCheck(ChessPiece.WHITE)){
-				System.out.println("Invalid move found.");
-				validity = false;
-			}
-		}
-		else { //blackTurn
-//			System.out.println("Or in here");
-//			System.out.println(checkBoard);
-//			System.out.println(checkBoard.blackPieces.size());
-			if (checkBoard.testCheck(ChessPiece.BLACK)){
-				System.out.println("Invalid move found.");
-				validity = false;
-			}
-		}
+		checkBoard.movePiece(checkBoard.grid[origin.row][origin.column], checkBoard.grid[target.row][target.column]);
+		
+		if (checkBoard.testCheck(origin.getPiece().getSide()))
+			validity = false;
+		
 		return validity;
 	}
 
@@ -493,7 +600,6 @@ public class Chessboard extends JPanel implements Cloneable{
 				this.grid[row][column] = (Square)original.grid[row][column].clone();
 			}
 		}
-		this.scanBoard();
 	}
 	
 	public Chessboard clone(){
@@ -508,7 +614,7 @@ public class Chessboard extends JPanel implements Cloneable{
 				if (grid[row][column].getPiece() != null){
 					rep += grid[row][column].getPiece();
 				}
-				else rep += "          ";
+				else rep += "  "+row+" "+","+" "+column+"   ";
 				rep += "] ";
 				output += rep;
 			}
