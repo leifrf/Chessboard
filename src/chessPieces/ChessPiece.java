@@ -39,7 +39,12 @@ public class ChessPiece implements Cloneable{
 	}
 	
 	public String toString(){
-		return name;
+		String team = "";
+		if (side == ChessPiece.WHITE)
+			team = "White ";
+		else
+			team = "Black ";
+		return team + name;
 	}
 	
 	public Object clone(){

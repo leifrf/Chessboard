@@ -18,27 +18,25 @@ import chessPieces.Queen;
 import chessPieces.Rook;
 
 
-public class Chessboard extends JPanel implements Cloneable{
+public class Chessboard_Simple extends JPanel implements Cloneable{
 
 	private static final long serialVersionUID = 1L;
 
 	private Square[][] grid = new Square[8][8];
+	
 	private Color selectColor = Color.red;
 	private Color availableColor = Color.orange;
 	private Color checkColor = Color.magenta;
+	
 	private Square selection;
 	private ArrayList<Square> selectionMoves = new ArrayList<Square>();
 	
-	private ArrayList<Square> blackPieces = new ArrayList<Square>();
-	private ArrayList<Square> whitePieces = new ArrayList<Square>();
-	// Not sure if this is really necessary
-
 	private boolean whiteTurn = true;
 	
 	
 	public static void main(String[] args){
 		JFrame frame = new JFrame();
-		Chessboard board = new Chessboard();
+		Chessboard_Simple board = new Chessboard_Simple();
 		frame.setTitle("Chessboard");
 		frame.add(board);
 		
@@ -50,25 +48,22 @@ public class Chessboard extends JPanel implements Cloneable{
 		
 	}
 	
-	public Chessboard(){
+	public Chessboard_Simple(){
 		this(Color.gray, Color.white);
 	}
 	
-	public Chessboard(Color color1, Color color2){
+	public Chessboard_Simple(Color color1, Color color2){
 		
 		initializeBoard(color1, color2);
 		
 		initializeSide(ChessPiece.WHITE);
 		initializeSide(ChessPiece.BLACK);
-		
-		scanBoard();
 	}
 	
 	private void initializeBoard(Color color1, Color color2){
 		int size = grid.length;
 		GridLayout layout = new GridLayout(size, size);
 		this.setLayout(layout);
-//		grid = new Square[size][size];
 		Color currentColor = color1;
 		for (int row = 0; row < size; row++){
 			for (int column = 0; column < size; column++){
@@ -79,6 +74,7 @@ public class Chessboard extends JPanel implements Cloneable{
 				grid[row][column] = new Square(currentColor, row, column);
 				SquareListener listener = new SquareListener();
 				grid[row][column].addActionListener(listener);
+//				grid[row][column].addActionListener(new SquareListener());
 				this.add(grid[row][column]);
 			}
 		}
@@ -99,23 +95,6 @@ public class Chessboard extends JPanel implements Cloneable{
 		grid[boardSide][5].setPiece(new Bishop(side));
 		grid[boardSide][3].setPiece(new Queen(side));
 		grid[boardSide][4].setPiece(new King(side));
-	}
-	
-	// Really inefficient way of updating sides
-	private void scanBoard(){
-		whitePieces.clear();
-		blackPieces.clear();
-		for (int row = 0; row < 8; row ++){
-			for (int column = 0; column < 8; column++){
-				ChessPiece piece = grid[row][column].getPiece();
-				if (piece != null){
-					if (piece.getSide() == ChessPiece.WHITE)
-						whitePieces.add(grid[row][column]);
-					else
-						blackPieces.add(grid[row][column]);
-				}
-			}
-		}
 	}
 
 	private class Position{
@@ -164,7 +143,7 @@ public class Chessboard extends JPanel implements Cloneable{
 				super.setIcon(null);
 			}
 			else {
-				super.setIcon(piece.getIcon());
+				super.setIcon(this.piece.getIcon());
 			}
 		}
 		
@@ -287,9 +266,7 @@ public class Chessboard extends JPanel implements Cloneable{
 					grid[row + shift][column - shift].getPiece() != null &&
 					grid[row + shift][column - shift].getPiece().getSide() != piece.getSide())
 				moves.add(new Position(row + shift, column - shift));
-
 			return moves;
-				
 		}
 		private ArrayList<Position> getMovesKing(){
 			ArrayList<Position> moves = new ArrayList<Position>();
@@ -312,6 +289,7 @@ public class Chessboard extends JPanel implements Cloneable{
 			moves.addAll(moveRecursive(row, column, 1, -1));
 			moves.addAll(moveRecursive(row, column, -1, 1));
 			moves.addAll(moveRecursive(row, column, -1, -1));
+//			System.out.println("For the Queen -1,-1 diagonal" + moveRecursive(row, column, -1, -1));
 			return moves;
 		}
 		public ArrayList<Position> moveHorizontal(){
@@ -331,6 +309,7 @@ public class Chessboard extends JPanel implements Cloneable{
 			int currentColumn = column + columnAdjust;
 			ArrayList<Position> moves = new ArrayList<Position>();
 			if(isValid(currentRow, currentColumn)){
+//				System.out.println(grid[currentRow][currentColumn]);
 				if(grid[currentRow][currentColumn].getPiece() == null){
 					moves.add(new Position(currentRow, currentColumn));
 					moves.addAll(moveRecursive(currentRow, currentColumn, rowAdjust, columnAdjust));
@@ -366,7 +345,6 @@ public class Chessboard extends JPanel implements Cloneable{
 			else if(selectionMoves.contains(square)){
 				movePiece(selection, square);
 				deselectSquare(selection);
-				scanBoard();
 				whiteTurn = !whiteTurn;
 			}
 //			testCheck(ChessPiece.WHITE);
@@ -375,7 +353,7 @@ public class Chessboard extends JPanel implements Cloneable{
 		
 	}
 	
-	protected void selectSquare(Square square){
+	private void selectSquare(Square square){
 		selection = square;
 		for (Position p : square.getMoves()){
 			if (testMove(grid[p.row][p.column])){
@@ -405,80 +383,95 @@ public class Chessboard extends JPanel implements Cloneable{
 		origin.setPiece(null);
 	}
 
-	public boolean testCheck(int side){
-		ArrayList<Square> positions;
-		Position kingPosition = null;
-		boolean checkDetected = false;
-		// Getting positions & kingPosition
-		if (side == ChessPiece.BLACK){
-			System.out.println("Testing black side.");
-			for (Square s : blackPieces){
-				if (s.getPiece() instanceof King){
-					kingPosition = new Position(s.row, s.column);
-					break;
+	private ArrayList<Square> getPieces(int side){
+		ArrayList<Square> pieces = new ArrayList<Square>();
+		for (int row = 0; row < 8; row++){
+			for (int column = 0; column < 8; column++){
+				Square s = grid[row][column];
+				if (s.getPiece() != null){
+					if (s.getPiece().getSide() == side)
+						pieces.add(s);
 				}
 			}
-			positions = whitePieces;
+		}
+		return pieces;
+	}
+	
+	private boolean testCheck(int side){
+		boolean checkDetected = false;
+		Square king = null;
+		ArrayList<Square> pieces;
+		int good;
+		int bad;
+		
+		if (side == ChessPiece.WHITE){
+			good = ChessPiece.WHITE;
+			bad = ChessPiece.BLACK;
 		}
 		else{
-			System.out.println("Testing white side.");
-			for (Square s : whitePieces){
-				if (s.getPiece() instanceof King){
-					kingPosition = new Position(s.row, s.column);
-					break;
-				}
+			good = ChessPiece.BLACK;
+			bad = ChessPiece.WHITE;
+		}
+			
+		pieces = getPieces(bad);
+		for (Square s : getPieces(good)){
+			if (s.getPiece() instanceof King){
+				king = s;
+				break;
 			}
-			positions = blackPieces;
-		} // Done getting positions
+		}
 		
-		// Finding checks
-		System.out.println("King at: " + kingPosition);
-		for (Square s : positions){
-//			if(s.getPiece() instanceof Queen)
-//				System.out.println("Testing piece " + s.getPiece() + " at " + s.row + ", " + s.column);
-//			System.out.println("Finding checks");
-			for (Position m : s.getMoves()){
-//				if(s.getPiece() instanceof Queen)
-//					System.out.println("Queen accesses square " + m + " King at " + kingPosition);
-				if (m.row == kingPosition.row && m.column == kingPosition.column){
-					s.setBackground(checkColor);
+//		System.out.println(this);
+//		System.out.println("White: " + getPieces(ChessPiece.WHITE));
+//		System.out.println("Black: " + getPieces(ChessPiece.BLACK));
+//		System.out.println();
+		
+		for (Square s : pieces){
+			ArrayList<Position> moves = new ArrayList<Position>();
+			// Get pawn threats
+			if (s.getPiece() instanceof Pawn){
+				Position pos1;
+				Position pos2;
+				int adjust;
+				//row < 8 && column < 8 && row > -1 && column > -1
+				if (s.getPiece().getSide() == ChessPiece.WHITE)
+					adjust = -1;
+				else
+					adjust = 1;
+				pos1 = new Position(s.row + adjust, s.column -1);
+				pos2 = new Position(s.row + adjust, s.column +1);
+				if(pos1.row < 8 && pos1.column < 8 && pos1.row > -1 && pos1.column > -1)
+					moves.add(pos1);
+				if(pos2.row < 8 && pos2.column < 8 && pos2.row > -1 && pos2.column > -1)
+					moves.add(pos2);
+			}
+			else
+				moves = s.getMoves();
+			for (Position p : moves){
+				if (p.row == king.row && p.column == king.column){
 					checkDetected = true;
-					System.out.println("Check detected.");
-					break;
+					s.setBackground(checkColor);
 				}
 			}
 		}
 		return checkDetected;
-	}
+		}
 
-	public boolean testCheckMate(int side){
-		return false;
-	}
-	
 	//returns true if move is valid
 	private boolean testMove(Square square){
 		System.out.println("Testing square: " + square);
-		Square backupSquare1 = (Square)selection.clone();
-		Square backupSquare2 = (Square)square.clone();
 		boolean validity = true;
 		
-		Chessboard checkBoard = (Chessboard)this.clone();
-		System.out.println("Board cloned in testMove.");
-		checkBoard.movePiece(checkBoard.grid[backupSquare1.row][backupSquare1.column], checkBoard.grid[backupSquare2.row][backupSquare2.column]);
-		System.out.println(checkBoard);
+		Chessboard_Simple checkBoard = (Chessboard_Simple)this.clone();
+		checkBoard.movePiece(checkBoard.grid[selection.row][selection.column], checkBoard.grid[square.row][square.column]);
+
 		if (whiteTurn){
-//			System.out.println("In here");
-//			System.out.println(checkBoard);
-//			System.out.println(checkBoard.whitePieces.size());
 			if (checkBoard.testCheck(ChessPiece.WHITE)){
 				System.out.println("Invalid move found.");
 				validity = false;
 			}
 		}
 		else { //blackTurn
-//			System.out.println("Or in here");
-//			System.out.println(checkBoard);
-//			System.out.println(checkBoard.blackPieces.size());
 			if (checkBoard.testCheck(ChessPiece.BLACK)){
 				System.out.println("Invalid move found.");
 				validity = false;
@@ -487,17 +480,16 @@ public class Chessboard extends JPanel implements Cloneable{
 		return validity;
 	}
 
-	private Chessboard(Chessboard original){
+	private Chessboard_Simple(Chessboard_Simple original){
 		for (int row = 0; row < 8; row++){
 			for (int column = 0; column < 8; column++){
 				this.grid[row][column] = (Square)original.grid[row][column].clone();
 			}
 		}
-		this.scanBoard();
 	}
 	
-	public Chessboard clone(){
-		return new Chessboard(this);
+	public Chessboard_Simple clone(){
+		return new Chessboard_Simple(this);
 	}
 
 	public String toString(){
@@ -508,7 +500,7 @@ public class Chessboard extends JPanel implements Cloneable{
 				if (grid[row][column].getPiece() != null){
 					rep += grid[row][column].getPiece();
 				}
-				else rep += "          ";
+				else rep += "  "+row+" "+","+" "+column+"   ";
 				rep += "] ";
 				output += rep;
 			}
