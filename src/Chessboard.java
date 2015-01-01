@@ -14,6 +14,7 @@ import javax.swing.JPanel;
 import javax.swing.border.Border;
 
 import chessPieces.Bishop;
+import chessPieces.Castleable;
 import chessPieces.ChessPiece;
 import chessPieces.King;
 import chessPieces.Knight;
@@ -71,10 +72,10 @@ public class Chessboard extends JPanel implements Cloneable {
 	}
 
 	/**
-	 * Default constructor Uses BEIGE and SIENNA colors
+	 * Default constructor Uses SIENNA and BEIGE colors
 	 */
 	public Chessboard() {
-		this(BEIGE, SIENNA);
+		this(SIENNA, BEIGE);
 	}
 
 	/**
@@ -551,6 +552,16 @@ public class Chessboard extends JPanel implements Cloneable {
 			} else {
 				currentSide = ChessPiece.BLACK;
 			}
+			
+			if(testKingSideCastle(ChessPiece.WHITE))
+				System.out.println("White can castle King Side.");
+			if(testQueenSideCastle(ChessPiece.WHITE))
+				System.out.println("White can castle Queen Side.");
+			if(testKingSideCastle(ChessPiece.BLACK))
+				System.out.println("Black can castle King Side.");
+			if(testQueenSideCastle(ChessPiece.BLACK))
+				System.out.println("Black can castle Queen Side.");
+			
 			// Selecting the piece
 			if (selection == null && square.getPiece() != null
 					&& square.getPiece().side == currentSide) {
@@ -706,7 +717,11 @@ public class Chessboard extends JPanel implements Cloneable {
 	 *            Target square.
 	 */
 	protected void movePiece(Square origin, Square target) {
-		target.setPiece(origin.getPiece());
+		ChessPiece piece = origin.getPiece();
+		// Checking Castleable
+		if (piece instanceof Castleable)
+			((Castleable) piece).setMoved();
+		target.setPiece(piece);
 		origin.setPiece(null);
 	}
 
@@ -766,6 +781,7 @@ public class Chessboard extends JPanel implements Cloneable {
 	 */
 	private boolean testCheck(int side) {
 		Square kingPosition = null;
+		boolean inCheck = false;
 		// Finding the King
 		for (int row = 0; row < 8; row++) {
 			for (int column = 0; column < 8; column++) {
@@ -777,9 +793,23 @@ public class Chessboard extends JPanel implements Cloneable {
 				}
 			}
 		}
-		// Returning check based on the following possibilities
-		return checkKnight(kingPosition) | checkPawn(kingPosition)
-				| checkLines(kingPosition);
+		ArrayList<Square> threats = new ArrayList<Square>();
+		threats.addAll(getThreats(kingPosition, side));
+		for (Square s : threats)
+			s.setBackground(checkColor);
+		if (threats.size() != 0)
+			inCheck = true;
+		
+		return inCheck;
+		
+	}
+	
+	private ArrayList<Square> getThreats(Square target, int side){
+		ArrayList<Square> threats = new ArrayList<Square>();
+		threats.addAll(knightThreat(target, side));
+		threats.addAll(pawnThreat(target, side));
+		threats.addAll(lineThreat(target, side));
+		return threats;
 	}
 
 	/**
@@ -791,13 +821,10 @@ public class Chessboard extends JPanel implements Cloneable {
 	 *            The position of the King.
 	 * @return true if the king is in check from a Knight.
 	 */
-	private boolean checkKnight(Square kingPosition) {
-
-		boolean inCheck = false;
+	private ArrayList<Square> knightThreat(Square kingPosition, int side) {
 
 		int row = kingPosition.row;
 		int column = kingPosition.column;
-		ChessPiece piece = kingPosition.getPiece();
 
 		// Possible moves
 		ArrayList<int[]> moves = new ArrayList<int[]>();
@@ -817,30 +844,34 @@ public class Chessboard extends JPanel implements Cloneable {
 				squares.add(grid[row + move[0]][column + move[1]]);
 		}
 		// Checking for check
-		// Highlight source Squares
+		ArrayList<Square> threatSquares = new ArrayList<Square>();
 		for (int i = 0; i < squares.size(); i++) {
 			Square s = squares.get(i);
+			// fairly sure checking null then instanceof is redundant
 			if (s.getPiece() != null && s.getPiece() instanceof Knight
-					&& s.getPiece().side != piece.side) {
-				inCheck = true;
-				s.setBackground(checkColor);
+					&& s.getPiece().side != side) {
+				threatSquares.add(s);
 			}
 		}
 
-		return inCheck;
+		return threatSquares;
 	}
 
 	/**
-	 * Checks the possible ways a Pawn could put the King in check. This is
+	 * Checks the possible ways a Pawn could attack the given square. This is
 	 * necessary because a Pawn may move forward but it cannot capture a piece
 	 * in doing so. This method only determines capturing moves.
 	 * 
-	 * @param kingPosition
+	 * If the given square is empty, then there is no possible capture. An
+	 * ArrayList of size 0 is returned.
+	 * 
+	 * @param target
 	 * @return
 	 */
-	private boolean checkPawn(Square kingPosition) {
+	private ArrayList<Square> pawnThreat(Square target, int side) {
 
-		int side = kingPosition.getPiece().side;
+		ArrayList<Square> validCaptures = new ArrayList<Square>();
+		
 		int adjust;
 		// Getting direction
 		if (side == ChessPiece.WHITE)
@@ -848,29 +879,22 @@ public class Chessboard extends JPanel implements Cloneable {
 		else
 			adjust = 1;
 		// Getting both possible moves
-		ChessPiece piece1 = null;
-		if (isValid(kingPosition.row + adjust, kingPosition.column + adjust))
-			piece1 = grid[kingPosition.row + adjust][kingPosition.column
-					+ adjust].getPiece();
-		ChessPiece piece2 = null;
-		if (isValid(kingPosition.row + adjust, kingPosition.column - adjust))
-			piece2 = grid[kingPosition.row + adjust][kingPosition.column
-					- adjust].getPiece();
+		Square square1 = null;
+		if (isValid(target.row + adjust, target.column + adjust))
+			square1 = grid[target.row + adjust][target.column
+					+ adjust];
+		Square square2 = null;
+		if (isValid(target.row + adjust, target.column - adjust))
+			square2 = grid[target.row + adjust][target.column
+					- adjust];
 
-		boolean inCheck = false;
-		// Testing both possible moves
-		if (piece1 instanceof Pawn && piece1.side != side) {
-			grid[kingPosition.row + adjust][kingPosition.column + adjust]
-					.setBackground(checkColor);
-			inCheck = true;
-		}
-		if (piece2 instanceof Pawn && piece2.side != side) {
-			grid[kingPosition.row + adjust][kingPosition.column - adjust]
-					.setBackground(checkColor);
-			inCheck = true;
-		}
 
-		return inCheck;
+		if (square1.getPiece() instanceof Pawn && square1.getPiece().side != side)
+			validCaptures.add(square1);
+		if (square2.getPiece() instanceof Pawn && square2.getPiece().side != side)
+			validCaptures.add(square2);
+		
+		return validCaptures;
 	}
 
 	/**
@@ -883,17 +907,15 @@ public class Chessboard extends JPanel implements Cloneable {
 	 *            Position of the King.
 	 * @return true if the King is in check.
 	 */
-	private boolean checkLines(Square kingPosition) {
-
-		boolean inCheck = false;
+	private ArrayList<Square> lineThreat(Square kingPosition, int side) {
 
 		int row = kingPosition.row;
 		int column = kingPosition.column;
-		// Only meant to be used with the king position
-		King piece = (King) kingPosition.getPiece();
-
+		
 		Square conflictSquare = null;
 
+		ArrayList<Square> squares = new ArrayList<Square>();
+		
 		// Possible lines
 		int[][] diagonals = new int[][] { new int[] { 1, 1 },
 				new int[] { 1, -1 }, new int[] { -1, 1 }, new int[] { -1, -1 } };
@@ -901,28 +923,26 @@ public class Chessboard extends JPanel implements Cloneable {
 				new int[] { -1, 0 }, new int[] { 0, -1 }, new int[] { 0, 1 } };
 		// Diagonals
 		for (int[] diag : diagonals) {
-			conflictSquare = checkRecursive(row, column, diag[0], diag[1]);
+			conflictSquare = threatRecursive(row, column, diag[0], diag[1]);
 			if (conflictSquare != null
-					&& conflictSquare.getPiece().side != piece.side
+					&& conflictSquare.getPiece().side != side
 					&& (conflictSquare.getPiece() instanceof Queen || conflictSquare
 							.getPiece() instanceof Bishop)) {
-				conflictSquare.setBackground(checkColor);
-				inCheck = true;
+				squares.add(conflictSquare);
 			}
 		}
 		// Rows & Columns
 		for (int[] line : rowCols) {
-			conflictSquare = checkRecursive(row, column, line[0], line[1]);
+			conflictSquare = threatRecursive(row, column, line[0], line[1]);
 			if (conflictSquare != null
-					&& conflictSquare.getPiece().side != piece.side
+					&& conflictSquare.getPiece().side != side
 					&& (conflictSquare.getPiece() instanceof Rook || conflictSquare
 							.getPiece() instanceof Queen)) {
-				conflictSquare.setBackground(checkColor);
-				inCheck = true;
+				squares.add(conflictSquare);
 			}
 		}
 
-		return inCheck;
+		return squares;
 	}
 
 	/**
@@ -940,7 +960,7 @@ public class Chessboard extends JPanel implements Cloneable {
 	 *            Row adjustment.
 	 * @return Following Square if the move is valid.
 	 */
-	private Square checkRecursive(int row, int column, int rowAdjust,
+	private Square threatRecursive(int row, int column, int rowAdjust,
 			int columnAdjust) {
 
 		Square square = null;
@@ -949,7 +969,7 @@ public class Chessboard extends JPanel implements Cloneable {
 		int currentColumn = column + columnAdjust;
 		if (isValid(currentRow, currentColumn)) {
 			if (grid[currentRow][currentColumn].getPiece() == null)
-				square = checkRecursive(currentRow, currentColumn, rowAdjust,
+				square = threatRecursive(currentRow, currentColumn, rowAdjust,
 						columnAdjust);
 			else
 				square = grid[currentRow][currentColumn];
@@ -983,6 +1003,69 @@ public class Chessboard extends JPanel implements Cloneable {
 		return validity;
 	}
 
+	private boolean testKingSideCastle(int side){
+		
+		int boardSide = 0;
+		if (side == ChessPiece.WHITE)
+			boardSide = 7;
+		
+		ChessPiece king = grid[boardSide][4].getPiece();
+		ChessPiece rook = grid[boardSide][7].getPiece();
+		
+		// King is castleable
+		boolean kingValid = king instanceof King &&
+							king.side == side &&
+							!((Castleable)king).hasMoved() &&
+							!testCheck(side);
+		// Rook is castleable
+		boolean rookValid = rook instanceof Rook &&
+							rook.side == side &&
+							!((Castleable)rook).hasMoved();
+		// No square between the King and the Rook is threatened
+		boolean betweenValid = grid[boardSide][5].getPiece() == null &&  
+							   getThreats(grid[boardSide][5], side).size() == 0 &&
+							   grid[boardSide][6].getPiece() == null && 
+							   getThreats(grid[boardSide][6], side).size() == 0;
+		
+//		System.out.println("kingValid: " + kingValid);
+//		System.out.println("-instance: " + (king instanceof King));
+//		System.out.println("-side: " + (king.side == side));
+//		System.out.println("-hasMoved: " + !((Castleable)king).hasMoved());
+//		System.out.println("rookValid: " + rookValid);
+//		System.out.println("betweenValid: " + betweenValid);
+		
+		return kingValid && rookValid && betweenValid;
+	}
+	
+	private boolean testQueenSideCastle(int side){
+		
+		int boardSide = 0;
+		if (side == ChessPiece.WHITE)
+			boardSide = 7;
+		
+		ChessPiece king = grid[boardSide][4].getPiece();
+		ChessPiece rook = grid[boardSide][0].getPiece();
+		
+		// King is castleable
+		boolean kingValid = king instanceof King &&
+							king.side == side &&
+							!((Castleable)king).hasMoved() &&
+							!testCheck(side);
+		// Rook is castleable
+		boolean rookValid = rook instanceof Rook &&
+							rook.side == side &&
+							!((Castleable)rook).hasMoved();
+		// No square between the King and the Rook is threatened
+		boolean betweenValid = grid[boardSide][3].getPiece() == null && 
+							   getThreats(grid[boardSide][3], side).size() == 0 &&
+							   grid[boardSide][2].getPiece() == null &&
+							   getThreats(grid[boardSide][2], side).size() == 0 &&
+							   grid[boardSide][1].getPiece() == null &&
+							   getThreats(grid[boardSide][1], side).size() == 0;
+		
+		return kingValid && rookValid && betweenValid;
+	}
+	
 	/**
 	 * Private constructor solely for the purpose of cloning.
 	 * 
