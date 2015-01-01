@@ -47,6 +47,7 @@ public class Chessboard extends JPanel implements Cloneable {
 	// Colors used in the program
 	private Color selectColor = FIREBRICK;
 	private Color availableColor = DARK_ORANGE;
+	private Color castleColor = availableColor.brighter(); 
 	private Color checkColor = DARK_SLATE_BLUE;
 	// The currently selected square
 	private Square selection;
@@ -142,9 +143,7 @@ public class Chessboard extends JPanel implements Cloneable {
 	 */
 	private void initializeSide(int side) {
 		// Starts as ChessPiece.WHITE
-		int boardSide = 7;
-		if (side == ChessPiece.BLACK)
-			boardSide = 0;
+		int boardSide = getBoardSide(side);
 		// Setting pawns
 		for (int column = 0; column < grid.length; column++)
 			grid[Math.abs(boardSide - 1)][column].setPiece(new Pawn(side));
@@ -158,6 +157,13 @@ public class Chessboard extends JPanel implements Cloneable {
 		grid[boardSide][4].setPiece(new King(side));
 	}
 
+	private int getBoardSide(int side){
+		int boardSide = 0;
+		if (side == ChessPiece.WHITE)
+			boardSide = 7;
+		return boardSide;
+	}
+	
 	/**
 	 * This is the primary component of the Chessboard. This class contains its
 	 * xy position in the grid, background color, and current piece. No two
@@ -282,7 +288,16 @@ public class Chessboard extends JPanel implements Cloneable {
 		 * Returns an exact replica of this square.
 		 */
 		public Object clone() {
-			return new Square(this.bkg, this.piece, this.row, this.column);
+			// This is really bad form.
+			// Every piece should be cloned in this process.
+			// Minimizing cloning is done solely to increase the speed of the program.
+			Square clonedSquare = new Square(this.bkg, this.row, this.column);
+			if (this.piece instanceof King || this.piece instanceof Rook)
+				clonedSquare.setPiece((ChessPiece)this.piece.clone());
+			else
+				clonedSquare.setPiece(this.piece);
+//			Square clonedSquare = new Square(this.bkg, this.piece, this.row, this.column);
+			return clonedSquare;
 		}
 
 		/**
@@ -464,6 +479,12 @@ public class Chessboard extends JPanel implements Cloneable {
 					}
 				}
 			}
+			
+			if (testKingSideCastle(this.piece.side))
+				moves.add(grid[getBoardSide(this.piece.side)][6]);
+			if (testQueenSideCastle(this.piece.side))
+				moves.add(grid[getBoardSide(this.piece.side)][2]);
+			
 			return moves;
 		}
 
@@ -553,15 +574,6 @@ public class Chessboard extends JPanel implements Cloneable {
 				currentSide = ChessPiece.BLACK;
 			}
 			
-			if(testKingSideCastle(ChessPiece.WHITE))
-				System.out.println("White can castle King Side.");
-			if(testQueenSideCastle(ChessPiece.WHITE))
-				System.out.println("White can castle Queen Side.");
-			if(testKingSideCastle(ChessPiece.BLACK))
-				System.out.println("Black can castle King Side.");
-			if(testQueenSideCastle(ChessPiece.BLACK))
-				System.out.println("Black can castle Queen Side.");
-			
 			// Selecting the piece
 			if (selection == null && square.getPiece() != null
 					&& square.getPiece().side == currentSide) {
@@ -571,7 +583,18 @@ public class Chessboard extends JPanel implements Cloneable {
 			}
 			// Moving the piece
 			else if (selectionMoves.contains(square)) {
-				movePiece(selection, square);
+				// Castling will have been filtered by this point
+				// square is a valid move
+				if (selection.getPiece() instanceof King &&
+						!((Castleable)selection.getPiece()).hasMoved() &&
+						square.row == getBoardSide(currentSide)){
+					if (square.column == 6)
+						kingSideCastle(currentSide);
+					else if (square.column == 2)
+						queenSideCastle(currentSide);
+				}
+				else
+					movePiece(selection, square);
 				deselectSquare(selection);
 
 				// Testing for end of game
@@ -717,6 +740,9 @@ public class Chessboard extends JPanel implements Cloneable {
 	 *            Target square.
 	 */
 	protected void movePiece(Square origin, Square target) {
+		
+//		System.out.println("Moving " + origin + " to " + target);
+		
 		ChessPiece piece = origin.getPiece();
 		// Checking Castleable
 		if (piece instanceof Castleable)
@@ -1003,11 +1029,18 @@ public class Chessboard extends JPanel implements Cloneable {
 		return validity;
 	}
 
+	/**
+	 * Castling follows this logic:
+	 * 1. Neither the king nor the chosen rook have been previously moved
+	 * 2. There are no pieces between the king and the chosen rook.
+	 * 3. The king is not currently in check.
+	 * 4. The king does not pass through a square that is attacked by an enemy piece.
+	 * @param side
+	 * @return
+	 */
 	private boolean testKingSideCastle(int side){
-		
-		int boardSide = 0;
-		if (side == ChessPiece.WHITE)
-			boardSide = 7;
+
+		int boardSide = getBoardSide(side);
 		
 		ChessPiece king = grid[boardSide][4].getPiece();
 		ChessPiece rook = grid[boardSide][7].getPiece();
@@ -1027,21 +1060,12 @@ public class Chessboard extends JPanel implements Cloneable {
 							   grid[boardSide][6].getPiece() == null && 
 							   getThreats(grid[boardSide][6], side).size() == 0;
 		
-//		System.out.println("kingValid: " + kingValid);
-//		System.out.println("-instance: " + (king instanceof King));
-//		System.out.println("-side: " + (king.side == side));
-//		System.out.println("-hasMoved: " + !((Castleable)king).hasMoved());
-//		System.out.println("rookValid: " + rookValid);
-//		System.out.println("betweenValid: " + betweenValid);
-		
 		return kingValid && rookValid && betweenValid;
 	}
 	
 	private boolean testQueenSideCastle(int side){
 		
-		int boardSide = 0;
-		if (side == ChessPiece.WHITE)
-			boardSide = 7;
+		int boardSide = getBoardSide(side);
 		
 		ChessPiece king = grid[boardSide][4].getPiece();
 		ChessPiece rook = grid[boardSide][0].getPiece();
@@ -1059,11 +1083,26 @@ public class Chessboard extends JPanel implements Cloneable {
 		boolean betweenValid = grid[boardSide][3].getPiece() == null && 
 							   getThreats(grid[boardSide][3], side).size() == 0 &&
 							   grid[boardSide][2].getPiece() == null &&
-							   getThreats(grid[boardSide][2], side).size() == 0 &&
-							   grid[boardSide][1].getPiece() == null &&
-							   getThreats(grid[boardSide][1], side).size() == 0;
+							   getThreats(grid[boardSide][2], side).size() == 0;
 		
 		return kingValid && rookValid && betweenValid;
+	}
+	
+	private void kingSideCastle(int side){
+		
+		System.out.println("Castling King Side");
+		
+		int boardSide = getBoardSide(side);
+		
+		movePiece(grid[boardSide][4], grid[boardSide][6]);
+		movePiece(grid[boardSide][7], grid[boardSide][5]);
+	}
+	
+	private void queenSideCastle(int side){
+		int boardSide = getBoardSide(side);
+		
+		movePiece(grid[boardSide][4], grid[boardSide][2]);
+		movePiece(grid[boardSide][0], grid[boardSide][3]);		
 	}
 	
 	/**

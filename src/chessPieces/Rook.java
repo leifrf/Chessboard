@@ -15,4 +15,17 @@ public class Rook extends ChessPiece implements Castleable{
 	public boolean hasMoved(){
 		return hasMoved;
 	}
+	
+	/**
+	 * Clone constructor
+	 */
+	private Rook(int side, boolean hasMoved){
+		this(side);
+		this.hasMoved = hasMoved;
+	}
+	
+	public Rook clone(){
+		return new Rook(side, hasMoved);
+	}
+
 }
