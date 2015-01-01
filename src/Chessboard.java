@@ -3,11 +3,15 @@ import java.awt.Dimension;
 import java.awt.GridLayout;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
+import java.awt.event.KeyEvent;
+import java.awt.event.KeyListener;
 import java.util.ArrayList;
 
+import javax.swing.BorderFactory;
 import javax.swing.JButton;
 import javax.swing.JFrame;
 import javax.swing.JPanel;
+import javax.swing.border.Border;
 
 import chessPieces.Bishop;
 import chessPieces.ChessPiece;
@@ -17,55 +21,101 @@ import chessPieces.Pawn;
 import chessPieces.Queen;
 import chessPieces.Rook;
 
-
-public class Chessboard extends JPanel implements Cloneable{
+/**
+ * This is a simple chess game. It follows the normal rules. For a full version
+ * of the rules, consult Wikipedia.
+ * 
+ * Castling and En-Passant are not currently supported.
+ * 
+ * This version does not support an AI.
+ * 
+ * @author Leif Raptis-Firth
+ *
+ */
+public class Chessboard extends JPanel implements Cloneable {
 
 	private static final long serialVersionUID = 1L;
-
+	// The squares in the game
 	private Square[][] grid = new Square[8][8];
-	
-	private Color selectColor = Color.red;
-	private Color availableColor = Color.orange;
-	private Color checkColor = Color.magenta;
-	
+	// Color references
+	private static final Color BEIGE = new Color(245, 245, 220);
+	private static final Color SIENNA = new Color(160, 82, 45);
+	private static final Color FIREBRICK = new Color(178, 34, 34);
+	private static final Color DARK_ORANGE = new Color(255, 140, 0);
+	private static final Color DARK_SLATE_BLUE = new Color(72, 61, 139);
+	// Colors used in the program
+	private Color selectColor = FIREBRICK;
+	private Color availableColor = DARK_ORANGE;
+	private Color checkColor = DARK_SLATE_BLUE;
+	// The currently selected square
 	private Square selection;
+	// The moves that the current square may perform
 	private ArrayList<Square> selectionMoves = new ArrayList<Square>();
-	
+	// Whose turn it currently is
 	private boolean whiteTurn = true;
-	
-	SquareListener listener = new SquareListener();
-	
-	public static void main(String[] args){
+
+	/**
+	 * Provides an example instance of the game.
+	 */
+	public static void main(String[] args) {
+
 		JFrame frame = new JFrame();
 		Chessboard board = new Chessboard();
 		frame.setTitle("Chessboard");
 		frame.add(board);
 		frame.setVisible(true);
-		frame.setSize(800,800);
+		frame.setSize(800, 800);
 		frame.setMinimumSize(new Dimension(600, 600));
 		frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
 		frame.setLocationRelativeTo(null);
 	}
-	
-	public Chessboard(){
-		this(Color.gray, Color.white);
+
+	/**
+	 * Default constructor Uses BEIGE and SIENNA colors
+	 */
+	public Chessboard() {
+		this(BEIGE, SIENNA);
 	}
-	
-	public Chessboard(Color color1, Color color2){
-		
+
+	/**
+	 * Creates a chess board with the given colors. It initializes the board and
+	 * sides.
+	 * 
+	 * @param color1
+	 *            Color for odd squares.
+	 * @param color2
+	 *            Color for even squares.
+	 */
+	public Chessboard(Color color1, Color color2) {
+
 		initializeBoard(color1, color2);
-		
 		initializeSide(ChessPiece.WHITE);
 		initializeSide(ChessPiece.BLACK);
+
+		// this.setFocusable(true);
+		// this.addKeyListener(new boardNavigator());
 	}
-	
-	private void initializeBoard(Color color1, Color color2){
+
+	/**
+	 * Populates the grid of Squares and sets their colors. Attaches a
+	 * SquareListener to each square.
+	 * 
+	 * @param color1
+	 *            Color for odd squares.
+	 * @param color2
+	 *            Color for even squares.
+	 */
+	private void initializeBoard(Color color1, Color color2) {
 		int size = grid.length;
 		GridLayout layout = new GridLayout(size, size);
 		this.setLayout(layout);
 		Color currentColor = color1;
-		for (int row = 0; row < size; row++){
-			for (int column = 0; column < size; column++){
+		// This listener does the game logic & user interaction
+		SquareListener listener = new SquareListener();
+		// For each square in the grid
+		for (int row = 0; row < size; row++) {
+			for (int column = 0; column < size; column++) {
+				// Select color based on square position
 				if (((row + column) & 1) == 1)
 					currentColor = color1;
 				else
@@ -76,8 +126,21 @@ public class Chessboard extends JPanel implements Cloneable{
 			}
 		}
 	}
-	
-	private void initializeSide(int side){
+
+	/**
+	 * Initializes the indicated side. Side is intended to be either
+	 * ChessPiece.WHITE or ChessPiece.BLACK. White is set at the bottom of the
+	 * board, Black at the top.
+	 * 
+	 * The side is defined as the following configuration of pieces: [Rook]
+	 * [Knight] [Bishop] [Queen] [King] [Bishop] [Knight] [Rook] [Pawn] [Pawn]
+	 * [Pawn] [Pawn] [Pawn] [Pawn] [Pawn] [Pawn]
+	 * 
+	 * @param side
+	 *            ChessPiece.WHITE or ChessPiece.BLACK
+	 */
+	private void initializeSide(int side) {
+		// Starts as ChessPiece.WHITE
 		int boardSide = 7;
 		if (side == ChessPiece.BLACK)
 			boardSide = 0;
@@ -94,90 +157,172 @@ public class Chessboard extends JPanel implements Cloneable{
 		grid[boardSide][4].setPiece(new King(side));
 	}
 
-	private class Position{
-		final int row;
-		final int column;
-		
-		Position(int row, int column){
-			this.row = row;
-			this.column = column;
-		}
-		
-		public String toString(){
-			return "(" + row + ", " + column + ")";
-		}
-	}
-	
-	private class Square extends JButton implements Cloneable{
-		
+	/**
+	 * This is the primary component of the Chessboard. This class contains its
+	 * xy position in the grid, background color, and current piece. No two
+	 * squares should share the same positions.
+	 * 
+	 * There are only 64 instances of Square, one for each square on the
+	 * Chessboard. A square's background color changes based on selection,
+	 * check, and move availability.
+	 * 
+	 * Every square is assigned a SquareListener. Currently, this is done in
+	 * initializeBoard(). It may be better to move it into Square later.
+	 * 
+	 * SquareListener is separately defined inner class that works directly with
+	 * Square. It may be better to implement ActionListener in Square instead
+	 * and do away with SquareListener.
+	 * 
+	 * @author Leif Raptis-Firth
+	 *
+	 */
+	private class Square extends JButton implements Cloneable {
+
 		private static final long serialVersionUID = 1L;
-		
+
 		private ChessPiece piece;
 		private Color bkg;
 		public final int row;
 		public final int column;
-		
-		public Square(Color color, int row, int column){
+
+		/**
+		 * This constructor is to initialize an empty Square.
+		 * 
+		 * @param color
+		 *            Background color.
+		 * @param row
+		 *            Row index in the grid. Expected to be between 0 and 7
+		 *            inclusive.
+		 * @param column
+		 *            Column index in the grid. Expected to be between 0 and 7
+		 *            inclusive.
+		 */
+		public Square(Color color, int row, int column) {
 			this(color, null, row, column);
 		}
-		
-		public Square(Color color, ChessPiece piece, int row, int column){
+
+		/**
+		 * This constructor is to initialize a Square with a ChessPiece.
+		 * 
+		 * @param color
+		 *            Background color.
+		 * @param piece
+		 *            A ChessPiece.
+		 * @param row
+		 *            Row index in the grid. Expected to be between 0 and 7
+		 *            inclusive.
+		 * @param column
+		 *            Column index in the grid. Expected to be between 0 and 7
+		 *            inclusive.
+		 */
+		public Square(Color color, ChessPiece piece, int row, int column) {
 			super();
+			// Technical configurations
 			super.setBackground(color);
 			this.row = row;
 			this.column = column;
 			this.setPiece(piece);
-			this.bkg = color;		
+			this.bkg = color;
+			// Cosmetic configurations
+			this.setFocusPainted(false);
+			this.setBorder(BorderFactory.createLineBorder(Color.BLACK));
 		}
-		
-		public void setPiece(ChessPiece piece){
+
+		/**
+		 * Sets the Square's piece. Pawn promotion is handled here. If the
+		 * ChessPiece does not have a valid ImageIcon, no image is set.
+		 * 
+		 * -- This may be a memory leak
+		 * 
+		 * @param piece
+		 *            The ChessPiece for this Square.
+		 */
+		public void setPiece(ChessPiece piece) {
 			this.piece = piece;
-			if (piece instanceof Pawn && (row == 0 || row == 7)){
-				System.out.println("Promoting pawn: " + this);
-				this.piece = new Queen(piece.getSide());
+			if (piece instanceof Pawn && (row == 0 || row == 7)) {
+				this.piece = new Queen(piece.side);
 			}
-			if (piece == null){
+			if (piece == null) {
 				super.setIcon(null);
-			}
-			else {
+			} else {
 				super.setIcon(this.piece.getIcon());
 			}
 		}
-		
-		public ChessPiece getPiece(){
+
+		/**
+		 * ChessPiece Accessor
+		 * 
+		 * @return The Square's ChessPiece.
+		 */
+		public ChessPiece getPiece() {
 			return this.piece;
 		}
-		
-		public void resetBackground(){
+
+		/**
+		 * Reset's the Square's background color to its original one.
+		 */
+		public void resetBackground() {
 			super.setBackground(bkg);
 		}
 
+		/**
+		 * Equality is based on position and piece.
+		 * 
+		 * @return true if the Squares have the same position and piece.
+		 */
 		@Override
-		public boolean equals(Object compare){
-			Square other = (Square)compare;
-			return other.getPiece() == this.piece && 
-					other.row == this.row && 
-					other.column == this.column;
+		public boolean equals(Object compare) {
+			Square other = (Square) compare;
+			return other.getPiece() == this.piece && other.row == this.row
+					&& other.column == this.column;
 		}
-		
-		public Object clone(){
+
+		/**
+		 * Returns an exact replica of this square.
+		 */
+		public Object clone() {
 			return new Square(this.bkg, this.piece, this.row, this.column);
 		}
-		
-		public String toString(){
-			return "(" + row + ", " + column +") " + piece;
-		}
-		
+
 		/**
-		 * Move Logic
+		 * A Square is defined by its indices and piece. Output: "(" + row +
+		 * ", " + column + ") " + piece i.e. "(3, 0) White Rook
+		 * 
+		 * @return String representation of the Square.
+		 */
+		public String toString() {
+			return "(" + row + ", " + column + ") " + piece;
+		}
+
+		/**
+		 * The below section contains the move logic for the game.
 		 */
 
-		private boolean isValid(int row, int column){
+		/**
+		 * Checks whether the two numbers are between 0 and 7 inclusive. This is
+		 * to determine whether or not it is a valid index on the grid.
+		 * 
+		 * @param row
+		 *            Row index of the grid.
+		 * @param column
+		 *            Column index of the grid.
+		 * @return true if both row and column are between 0 and 7 inclusive.
+		 */
+		private boolean isValid(int row, int column) {
 			return row < 8 && column < 8 && row > -1 && column > -1;
 		}
 
-		private ArrayList<Position> getMoves(){
-			ArrayList<Position> moves = new ArrayList<Position>();
+		/**
+		 * Determines the list of possible moves for the piece. This DOES NOT
+		 * take "check" into consideration. The list includes moves that may
+		 * leave the King in check. These are not legal and are handled later.
+		 * 
+		 * -- Consider including testCheck here.
+		 * 
+		 * @return List of possible moves.
+		 */
+		private ArrayList<Square> getMoves() {
+			ArrayList<Square> moves = new ArrayList<Square>();
 			if (piece instanceof Knight)
 				moves = getMovesKnight();
 			else if (piece instanceof Bishop)
@@ -192,429 +337,680 @@ public class Chessboard extends JPanel implements Cloneable{
 				moves = getMovesKing();
 			return moves;
 		}
-		
-		private ArrayList<Position> getMovesKnight(){
-			
+
+		/**
+		 * Determines the list of possible moves for a Knight.
+		 * 
+		 * @return List of possible moves for a Knight.
+		 */
+		private ArrayList<Square> getMovesKnight() {
+
+			// Moves for a Knight independent of the board
 			ArrayList<int[]> moves = new ArrayList<int[]>();
-			moves.add(new int[]{1, 2});
-			moves.add(new int[]{1, -2});
-			moves.add(new int[]{-1, 2});
-			moves.add(new int[]{-1, -2});
-			moves.add(new int[]{2, 1});
-			moves.add(new int[]{2, -1});
-			moves.add(new int[]{-2, 1});
-			moves.add(new int[]{-2, -1});
-			
-			ArrayList<Position> positions = new ArrayList<Position>();
-			for (int[] move : moves){
-				if(isValid(row + move[0], column + move[1]))
-					positions.add(new Position(row + move[0], column + move[1]));
+			moves.add(new int[] { 1, 2 });
+			moves.add(new int[] { 1, -2 });
+			moves.add(new int[] { -1, 2 });
+			moves.add(new int[] { -1, -2 });
+			moves.add(new int[] { 2, 1 });
+			moves.add(new int[] { 2, -1 });
+			moves.add(new int[] { -2, 1 });
+			moves.add(new int[] { -2, -1 });
+
+			// Filtering valid Squares
+			ArrayList<Square> squares = new ArrayList<Square>();
+			for (int[] move : moves) {
+				if (isValid(row + move[0], column + move[1]))
+					squares.add(grid[row + move[0]][column + move[1]]);
 			}
-			for (int i = 0; i < positions.size(); i++){
-				Position p = positions.get(i);
-				if (grid[p.row][p.column].getPiece() != null &&
-						grid[p.row][p.column].getPiece().getSide() == piece.getSide())
-					positions.remove(p);
+			// Filtering valid moves
+			for (int i = 0; i < squares.size(); i++) {
+				Square s = squares.get(i);
+				if (s.getPiece() != null && s.getPiece().side == piece.side)
+					squares.remove(s);
 			}
-			
-			return positions;
+
+			return squares;
 		}
-		private ArrayList<Position> getMovesBishop(){
+
+		/**
+		 * Determines the list of possible moves for a Bishop.
+		 * 
+		 * @return List of possible moves for a Bishop.
+		 */
+		private ArrayList<Square> getMovesBishop() {
 			return moveDiagonal();
 		}
-		private ArrayList<Position> getMovesRook(){
-			ArrayList<Position> moves = new ArrayList<Position>();
+
+		/**
+		 * Determines the list of possible moves for a Rook.
+		 * 
+		 * @return List of possible moves for a Rook.
+		 */
+		private ArrayList<Square> getMovesRook() {
+			ArrayList<Square> moves = new ArrayList<Square>();
 			moves.addAll(moveHorizontal());
 			moves.addAll(moveVertical());
 			return moves;
 		}
-		private ArrayList<Position> getMovesQueen(){
-			ArrayList<Position> moves = new ArrayList<Position>();
+
+		/**
+		 * Determines the list of possible moves for a Queen.
+		 * 
+		 * @return List of possible moves for a Queen.
+		 */
+		private ArrayList<Square> getMovesQueen() {
+			ArrayList<Square> moves = new ArrayList<Square>();
 			moves.addAll(moveDiagonal());
 			moves.addAll(moveHorizontal());
 			moves.addAll(moveVertical());
 			return moves;
 		}
-		private ArrayList<Position> getMovesPawn(){
+
+		/**
+		 * Determines the list of possible moves for a Pawn. This does not cover
+		 * En-Passent.
+		 * 
+		 * @return List of possible moves for a Pawn.
+		 */
+		private ArrayList<Square> getMovesPawn() {
 			int shift;
-			if (piece.getSide() == ChessPiece.BLACK)
+			if (piece.side == ChessPiece.BLACK)
 				shift = 1;
 			else
 				shift = -1;
-			
-			ArrayList<Position> moves = new ArrayList<Position>();
+
+			ArrayList<Square> moves = new ArrayList<Square>();
 			// Move forward 2 if on original row
-			if ((row == 1 && piece.getSide() == ChessPiece.BLACK ||
-					row == 6 && piece.getSide() == ChessPiece.WHITE) &&
-					grid[row + shift][column].getPiece() == null &&
-					grid[row + shift * 2][column].getPiece() == null){
-				moves.add(new Position(row + shift * 2, column));		
+			if ((row == 1 && piece.side == ChessPiece.BLACK || row == 6
+					&& piece.side == ChessPiece.WHITE)
+					&& grid[row + shift][column].getPiece() == null
+					&& grid[row + shift * 2][column].getPiece() == null) {
+				moves.add(grid[row + shift * 2][column]);
 			}
 			// Move forward 1
 			if (grid[row + shift][column].getPiece() == null)
-				moves.add(new Position(row + shift, column));
-			// Take piece to the right
-			if (isValid(row + shift, column + shift) &&
-					grid[row + shift][column + shift].getPiece() != null &&
-					grid[row + shift][column + shift].getPiece().getSide() != piece.getSide())
-				moves.add(new Position(row + shift, column + shift));
-			// Take piece to the left
-			if (isValid(row + shift, column - shift) &&
-					grid[row + shift][column - shift].getPiece() != null &&
-					grid[row + shift][column - shift].getPiece().getSide() != piece.getSide())
-				moves.add(new Position(row + shift, column - shift));
+				moves.add(grid[row + shift][column]);
+			// Take piece to one diagonal
+			if (isValid(row + shift, column + shift)
+					&& grid[row + shift][column + shift].getPiece() != null
+					&& grid[row + shift][column + shift].getPiece().side != piece.side)
+				moves.add(grid[row + shift][column + shift]);
+			// Take piece to the other diagonal
+			if (isValid(row + shift, column - shift)
+					&& grid[row + shift][column - shift].getPiece() != null
+					&& grid[row + shift][column - shift].getPiece().side != piece.side)
+				moves.add(grid[row + shift][column - shift]);
 			return moves;
 		}
-		private ArrayList<Position> getMovesKing(){
-			ArrayList<Position> moves = new ArrayList<Position>();
-			int[] shift = new int[]{1, 0, -1};
-			for (int i : shift){
-				for (int j : shift){
-					if (isValid(row + i, column + j)){
+
+		/**
+		 * Determines the list of possible moves for a King. This does not
+		 * filter moving into check. This is handled later on, in testCheck.
+		 * 
+		 * @return List of possible moves for a King.
+		 */
+		private ArrayList<Square> getMovesKing() {
+			ArrayList<Square> moves = new ArrayList<Square>();
+			int[] shift = new int[] { 1, 0, -1 };
+			// For each possible target index
+			// Technically considers the King's own position as well
+			for (int i : shift) {
+				for (int j : shift) {
+					if (isValid(row + i, column + j)) {
 						ChessPiece piece = grid[row + i][column + j].getPiece();
-						if (piece == null || piece.getSide() != this.piece.getSide())
-							moves.add(new Position(row + i, column + j));
+						if (piece == null || piece.side != this.piece.side)
+							moves.add(grid[row + i][column + j]);
 					}
 				}
 			}
 			return moves;
 		}
 
-		public ArrayList<Position> moveDiagonal(){
-			ArrayList<Position> moves = new ArrayList<Position>();
+		/**
+		 * @return List of possible moves along a diagonal line.
+		 */
+		private ArrayList<Square> moveDiagonal() {
+			ArrayList<Square> moves = new ArrayList<Square>();
 			moves.addAll(moveRecursive(row, column, 1, 1));
 			moves.addAll(moveRecursive(row, column, 1, -1));
 			moves.addAll(moveRecursive(row, column, -1, 1));
 			moves.addAll(moveRecursive(row, column, -1, -1));
 			return moves;
 		}
-		public ArrayList<Position> moveHorizontal(){
-			ArrayList<Position> moves = new ArrayList<Position>();
+
+		/**
+		 * @return List of possible moves along a horizontal line.
+		 */
+		private ArrayList<Square> moveHorizontal() {
+			ArrayList<Square> moves = new ArrayList<Square>();
 			moves.addAll(moveRecursive(row, column, 0, 1));
-			moves.addAll(moveRecursive(row, column,0, -1));
+			moves.addAll(moveRecursive(row, column, 0, -1));
 			return moves;
 		}
-		public ArrayList<Position> moveVertical(){
-			ArrayList<Position> moves = new ArrayList<Position>();
+
+		/**
+		 * @return List of possible moves along a vertical.
+		 */
+		private ArrayList<Square> moveVertical() {
+			ArrayList<Square> moves = new ArrayList<Square>();
 			moves.addAll(moveRecursive(row, column, 1, 0));
 			moves.addAll(moveRecursive(row, column, -1, 0));
 			return moves;
-		}	
-		public ArrayList<Position> moveRecursive(int row, int column, int rowAdjust, int columnAdjust){
+		}
+
+		/**
+		 * This is the primary worker for move generators. It will check all
+		 * valid moves originating from the given index.
+		 * 
+		 * @param row
+		 *            Starting row.
+		 * @param column
+		 *            Starting column.
+		 * @param rowAdjust
+		 *            Adjustment for row.
+		 * @param columnAdjust
+		 *            Adjustment for column.
+		 * @return List of valid moves from the originating square.
+		 */
+		public ArrayList<Square> moveRecursive(int row, int column,
+				int rowAdjust, int columnAdjust) {
 			int currentRow = row + rowAdjust;
 			int currentColumn = column + columnAdjust;
-			ArrayList<Position> moves = new ArrayList<Position>();
-			if(isValid(currentRow, currentColumn)){
-				if(grid[currentRow][currentColumn].getPiece() == null){
-					moves.add(new Position(currentRow, currentColumn));
-					moves.addAll(moveRecursive(currentRow, currentColumn, rowAdjust, columnAdjust));
-				}
-				else if (grid[currentRow][currentColumn].getPiece().getSide() != piece.getSide())
-					moves.add(new Position(currentRow, currentColumn));
+			ArrayList<Square> moves = new ArrayList<Square>();
+			if (isValid(currentRow, currentColumn)) {
+				if (grid[currentRow][currentColumn].getPiece() == null) {
+					moves.add(grid[currentRow][currentColumn]);
+					moves.addAll(moveRecursive(currentRow, currentColumn,
+							rowAdjust, columnAdjust));
+				} else if (grid[currentRow][currentColumn].getPiece().side != piece.side)
+					moves.add(grid[currentRow][currentColumn]);
 			}
 			return moves;
 		}
 
 	}
 
-	private class SquareListener implements ActionListener{
-		
+	/**
+	 * This listener determines the validity of action. Alternating of turns and
+	 * end of game are determined here. It uses the following global variables:
+	 * selection, selectionMoves, whiteTurn.
+	 * 
+	 * -- Consider refactoring this to be a part of Square by implementation.
+	 * 
+	 * @author Leif Raptis-Firth
+	 *
+	 */
+	private class SquareListener implements ActionListener {
+
 		@Override
 		public void actionPerformed(ActionEvent e) {
-			Square square = (Square)e.getSource();
+			Square square = (Square) e.getSource();
 			int currentSide;
-			if (whiteTurn){
+			if (whiteTurn) {
 				currentSide = ChessPiece.WHITE;
-			}
-			else{
+			} else {
 				currentSide = ChessPiece.BLACK;
 			}
 			// Selecting the piece
-			if(selection == null && square.getPiece() != null && square.getPiece().getSide() == currentSide){
+			if (selection == null && square.getPiece() != null
+					&& square.getPiece().side == currentSide) {
 				selectSquare(square);
-			}
-			else if(selection == square){
+			} else if (selection == square) {
 				deselectSquare(square);
 			}
 			// Moving the piece
-			else if(selectionMoves.contains(square)){
+			else if (selectionMoves.contains(square)) {
 				movePiece(selection, square);
 				deselectSquare(selection);
-				
-				if (whiteTurn){
-					if(victory(ChessPiece.WHITE))
-						System.out.println("White wins.");
-				}
+
+				// Testing for end of game
+				if (whiteTurn)
+					victory(ChessPiece.WHITE);
 				else
-					if(victory(ChessPiece.BLACK))
-						System.out.println("Black wins.");
-				
+					victory(ChessPiece.BLACK);
+
 				whiteTurn = !whiteTurn;
 			}
 		}
-		
-	}
-	
-	private boolean victory(int side){
 
-//		System.out.println("in victory.");
-		
-		int otherSide;
-		if (side == ChessPiece.WHITE)
-			otherSide = ChessPiece.BLACK;
-		else
-			otherSide = ChessPiece.WHITE;
-			
-		if (testCheck(otherSide)){
-//			System.out.println("check detected.");
-			return testCheckMate(otherSide);
-		}
-		return false;
-//		return testCheck(side) && testCheckMate(side);
 	}
-	
-	private void selectSquare(Square square){
+
+	// In progress for a later version
+	private class boardNavigator implements KeyListener {
+
+		private int[] index = new int[] { 0, 0 };
+		// initialized to impossible value
+		private int[] newIndex = new int[] { 0, 0 };
+
+		@Override
+		public void keyPressed(KeyEvent e) {
+			int key = e.getKeyCode();
+			String keyName = "";
+			if (key == KeyEvent.VK_UP)
+				newIndex[0] = index[0] - 1;
+			else if (key == KeyEvent.VK_LEFT)
+				newIndex[1] = index[1] - 1;
+			else if (key == KeyEvent.VK_RIGHT)
+				newIndex[1] = index[1] + 1;
+			else if (key == KeyEvent.VK_DOWN)
+				newIndex[0] = index[0] + 1;
+			else if (key == KeyEvent.VK_ENTER)
+				grid[index[0]][index[1]].doClick();
+
+			if (isValid(newIndex[0], newIndex[1])) {
+				index[0] = newIndex[0];
+				index[1] = newIndex[1];
+			}
+
+			if (keyName != "")
+				System.out.println("Pressed " + keyName);
+		}
+
+		@Override
+		public void keyReleased(KeyEvent e) {
+			// System.out.println("Key released.");
+		}
+
+		@Override
+		public void keyTyped(KeyEvent e) {
+			// System.out.println("Key typed.");
+		}
+
+	}
+
+	/**
+	 * Determines whether the given side has check mated their opponent.
+	 * 
+	 * @param side
+	 *            ChessPiece.WHITE or ChessPiece.BLACK
+	 * @return true if the given side has achieved a check mate.
+	 */
+	private boolean victory(int side) {
+
+		boolean gameOver = false;
+
+		Color winnerColour = null;
+		int otherSide;
+		// Getting the proper sides
+		if (side == ChessPiece.WHITE) {
+			winnerColour = Color.WHITE;
+			otherSide = ChessPiece.BLACK;
+		} else {
+			winnerColour = Color.BLACK;
+			otherSide = ChessPiece.WHITE;
+		}
+		// Testing check the checkMate
+		// Consider refactoring to only test checkMate here
+		if (testCheck(otherSide)) {
+			gameOver = testCheckMate(otherSide);
+		}
+		// Set border to indicate check mate to user
+		if (gameOver) {
+			Border b = BorderFactory.createLineBorder(winnerColour, 10);
+			this.setBorder(b);
+		}
+		return gameOver;
+	}
+
+	/**
+	 * Selects the clicked square. This method uses the global variables:
+	 * selection, selectionMoves
+	 * 
+	 * -- Refactor to remove the use of globals
+	 * 
+	 * @param square
+	 *            The clicked square.
+	 */
+	private void selectSquare(Square square) {
 		selection = square;
-		for (Position p : square.getMoves()){
-			if (testMove(square, grid[p.row][p.column])){
-				selectionMoves.add(grid[p.row][p.column]);
-				grid[p.row][p.column].setBackground(availableColor);
+		// Highlight possible moves
+		for (Square destination : square.getMoves()) {
+			if (testMove(square, destination)) {
+				selectionMoves.add(destination);
+				destination.setBackground(availableColor);
 			}
 		}
-		if (selectionMoves.size() != 0){
+		// If the piece can't move, don't highlight it
+		if (selectionMoves.size() != 0) {
 			square.setBackground(selectColor);
-		}
-		else
+		} else
 			selection = null;
-		
+
 	}
-	private void deselectSquare(Square square){
+
+	/**
+	 * Deselects the currently selected square. This method uses globals
+	 * selection and selectionMoves.
+	 *
+	 * -- Consider refactoring out globals.
+	 * 
+	 * @param square
+	 *            The square to be deselected
+	 */
+	private void deselectSquare(Square square) {
 		square.resetBackground();
 		selection = null;
-		for (Square s : selectionMoves){
+		for (Square s : selectionMoves) {
 			s.resetBackground();
 		}
 		selectionMoves.clear();
 	}
-	protected void movePiece(Square origin, Square target){
+
+	/**
+	 * Moves the origin Square's piece to the target square. The origin square
+	 * is set to have no piece afterwards.
+	 * 
+	 * @param origin
+	 *            Originating square.
+	 * @param target
+	 *            Target square.
+	 */
+	protected void movePiece(Square origin, Square target) {
 		target.setPiece(origin.getPiece());
 		origin.setPiece(null);
 	}
 
-	private boolean isValid(int row, int column){
+	/**
+	 * Analogous to isValid in Square.
+	 */
+	private boolean isValid(int row, int column) {
 		return row < 8 && column < 8 && row > -1 && column > -1;
 	}
-	
+
 	/**
-	 * RETURNS TRUE IF IN CHECKMATE 
+	 * Tests whether the given side has been check mated. Check mate is defined
+	 * such that there are no possible moves for the given side that do not
+	 * result in being in check.
 	 * 
 	 * @param side
-	 * @return
+	 *            ChessPiece.WHITE or ChessPiece.BLACK.
+	 * @return True if the given side is IN check mate.
 	 */
-	private boolean testCheckMate(int side){
-		
+	private boolean testCheckMate(int side) {
+
 		boolean inCheckMate = true;
-		
+
+		// Getting pieces on the given side
 		ArrayList<Square> pieces = new ArrayList<Square>();
-		for (Square[] squares : grid){
-			for (Square s : squares){
-				if (s.getPiece() != null && s.getPiece().getSide() == side)
+		for (Square[] squares : grid) {
+			for (Square s : squares) {
+				if (s.getPiece() != null && s.getPiece().side == side)
 					pieces.add(s);
 			}
 		}
-
-		for (Square s : pieces){
-			for (Position p : s.getMoves()){
-				if (testMove(s, grid[p.row][p.column])){
-					// This is where I would grab the squares for highlight options for moving out of check
-//					System.out.println("Valid move: " + s + " to " + grid[p.row][p.column]);
+		// Test if they can move
+		for (Square s : pieces) {
+			for (Square destination : s.getMoves()) {
+				if (testMove(s, destination)) {
+					// This is where I would grab the squares for highlight
+					// options for moving out of check
+					// System.out.println("Valid move: " + s + " to " +
+					// grid[p.row][p.column]);
 					inCheckMate = false;
 				}
 			}
 		}
-		
+
 		return inCheckMate;
-		
+
 	}
-	
+
 	/**
-	 * RETURNS TRUE IF IN CHECK
+	 * Tests whether the given side is in check. Check is defined as one or more
+	 * opposing pieces being able to move to the Square the king currently
+	 * occupies. This is tested from the King's position outward.
 	 * 
 	 * @param side
+	 *            The given side to test for being in check.
 	 * @return true if in check
 	 */
-	private boolean testCheck(int side){
-//		System.out.println("Testing check.");
+	private boolean testCheck(int side) {
 		Square kingPosition = null;
-		for (int row = 0; row < 8; row++){
-			for (int column = 0; column < 8; column++){
-				if (grid[row][column].getPiece() != null &&
-						grid[row][column].getPiece() instanceof King &&	
-						grid[row][column].getPiece().getSide() == side){
+		// Finding the King
+		for (int row = 0; row < 8; row++) {
+			for (int column = 0; column < 8; column++) {
+				if (grid[row][column].getPiece() != null
+						&& grid[row][column].getPiece() instanceof King
+						&& grid[row][column].getPiece().side == side) {
 					kingPosition = grid[row][column];
 					break;
 				}
 			}
 		}
-//		System.out.println("King found in testCheck.");
-		
-		return checkKnight(kingPosition) | checkPawn(kingPosition) | checkLines(kingPosition);
+		// Returning check based on the following possibilities
+		return checkKnight(kingPosition) | checkPawn(kingPosition)
+				| checkLines(kingPosition);
 	}
-	private boolean checkKnight(Square kingPosition){
-		
-//		System.out.println("in checkKnight.");
-		
+
+	/**
+	 * Analogous to moveKnight in Square. Checks all the possible ways a Knight
+	 * could access the King's square. If any of the Squares contains an
+	 * opposing Knight, the King is in check.
+	 * 
+	 * @param kingPosition
+	 *            The position of the King.
+	 * @return true if the king is in check from a Knight.
+	 */
+	private boolean checkKnight(Square kingPosition) {
+
 		boolean inCheck = false;
-		
+
 		int row = kingPosition.row;
 		int column = kingPosition.column;
 		ChessPiece piece = kingPosition.getPiece();
-		
+
+		// Possible moves
 		ArrayList<int[]> moves = new ArrayList<int[]>();
-		moves.add(new int[]{1, 2});
-		moves.add(new int[]{1, -2});
-		moves.add(new int[]{-1, 2});
-		moves.add(new int[]{-1, -2});
-		moves.add(new int[]{2, 1});
-		moves.add(new int[]{2, -1});
-		moves.add(new int[]{-2, 1});
-		moves.add(new int[]{-2, -1});
-		
-		ArrayList<Position> positions = new ArrayList<Position>();
-		for (int[] move : moves){
-			if(isValid(row + move[0], column + move[1]))
-				positions.add(new Position(row + move[0], column + move[1]));
+		moves.add(new int[] { 1, 2 });
+		moves.add(new int[] { 1, -2 });
+		moves.add(new int[] { -1, 2 });
+		moves.add(new int[] { -1, -2 });
+		moves.add(new int[] { 2, 1 });
+		moves.add(new int[] { 2, -1 });
+		moves.add(new int[] { -2, 1 });
+		moves.add(new int[] { -2, -1 });
+
+		// Filtering valid moves
+		ArrayList<Square> squares = new ArrayList<Square>();
+		for (int[] move : moves) {
+			if (isValid(row + move[0], column + move[1]))
+				squares.add(grid[row + move[0]][column + move[1]]);
 		}
-		for (int i = 0; i < positions.size(); i++){
-			Position p = positions.get(i);
-			if (grid[p.row][p.column].getPiece() != null &&
-					grid[p.row][p.column].getPiece() instanceof Knight &&
-					grid[p.row][p.column].getPiece().getSide() != piece.getSide()){
+		// Checking for check
+		// Highlight source Squares
+		for (int i = 0; i < squares.size(); i++) {
+			Square s = squares.get(i);
+			if (s.getPiece() != null && s.getPiece() instanceof Knight
+					&& s.getPiece().side != piece.side) {
 				inCheck = true;
-				grid[p.row][p.column].setBackground(checkColor);
+				s.setBackground(checkColor);
 			}
 		}
-		
+
 		return inCheck;
 	}
-	private boolean checkPawn (Square kingPosition){
-		
-//		System.out.println("in checkPawn");
-		
-		int side = kingPosition.getPiece().getSide();
+
+	/**
+	 * Checks the possible ways a Pawn could put the King in check. This is
+	 * necessary because a Pawn may move forward but it cannot capture a piece
+	 * in doing so. This method only determines capturing moves.
+	 * 
+	 * @param kingPosition
+	 * @return
+	 */
+	private boolean checkPawn(Square kingPosition) {
+
+		int side = kingPosition.getPiece().side;
 		int adjust;
 		// Getting direction
 		if (side == ChessPiece.WHITE)
 			adjust = -1;
 		else
 			adjust = 1;
-		
+		// Getting both possible moves
 		ChessPiece piece1 = null;
 		if (isValid(kingPosition.row + adjust, kingPosition.column + adjust))
-			piece1 = grid[kingPosition.row + adjust][kingPosition.column + adjust].getPiece();
-		ChessPiece piece2 = null; 
+			piece1 = grid[kingPosition.row + adjust][kingPosition.column
+					+ adjust].getPiece();
+		ChessPiece piece2 = null;
 		if (isValid(kingPosition.row + adjust, kingPosition.column - adjust))
-			piece2 = grid[kingPosition.row + adjust][kingPosition.column - adjust].getPiece();
-		
+			piece2 = grid[kingPosition.row + adjust][kingPosition.column
+					- adjust].getPiece();
+
 		boolean inCheck = false;
-		
-		if (piece1 instanceof Pawn && piece1.getSide() != side){
-			grid[kingPosition.row + adjust][kingPosition.column + adjust].setBackground(checkColor);
+		// Testing both possible moves
+		if (piece1 instanceof Pawn && piece1.side != side) {
+			grid[kingPosition.row + adjust][kingPosition.column + adjust]
+					.setBackground(checkColor);
 			inCheck = true;
 		}
-		if (piece2 instanceof Pawn && piece2.getSide() != side){
-			grid[kingPosition.row + adjust][kingPosition.column - adjust].setBackground(checkColor);
+		if (piece2 instanceof Pawn && piece2.side != side) {
+			grid[kingPosition.row + adjust][kingPosition.column - adjust]
+					.setBackground(checkColor);
 			inCheck = true;
 		}
-		
+
 		return inCheck;
 	}
-	private boolean checkLines(Square kingPosition){
-		
-//		System.out.println("in checKLines.");
-		
+
+	/**
+	 * Checks diagonals, horizontals, and verticals for check.
+	 * 
+	 * This is only meant to be used with the King's position. Any other call
+	 * will result in a casting Exception.
+	 * 
+	 * @param kingPosition
+	 *            Position of the King.
+	 * @return true if the King is in check.
+	 */
+	private boolean checkLines(Square kingPosition) {
+
 		boolean inCheck = false;
-		
+
 		int row = kingPosition.row;
 		int column = kingPosition.column;
-		//Only meant to be used with the king position
-		King piece = (King)kingPosition.getPiece();
-		
+		// Only meant to be used with the king position
+		King piece = (King) kingPosition.getPiece();
+
 		Square conflictSquare = null;
-		
-		int[][] diagonals = new int[][]{new int[]{1, 1}, new int[]{1, -1}, new int[]{-1, 1}, new int[]{-1, -1}};
-		int[][] rows = 		new int[][]{new int[]{1, 0}, new int[]{-1, 0}, new int[]{0, -1}, new int[]{0, 1}};
-		//Diagonals
-		for (int[] diag : diagonals){
+
+		// Possible lines
+		int[][] diagonals = new int[][] { new int[] { 1, 1 },
+				new int[] { 1, -1 }, new int[] { -1, 1 }, new int[] { -1, -1 } };
+		int[][] rowCols = new int[][] { new int[] { 1, 0 },
+				new int[] { -1, 0 }, new int[] { 0, -1 }, new int[] { 0, 1 } };
+		// Diagonals
+		for (int[] diag : diagonals) {
 			conflictSquare = checkRecursive(row, column, diag[0], diag[1]);
-			if (conflictSquare != null &&
-				conflictSquare.getPiece().getSide() != piece.getSide() && 
-				(conflictSquare.getPiece() instanceof Queen || conflictSquare.getPiece() instanceof Bishop)){
+			if (conflictSquare != null
+					&& conflictSquare.getPiece().side != piece.side
+					&& (conflictSquare.getPiece() instanceof Queen || conflictSquare
+							.getPiece() instanceof Bishop)) {
 				conflictSquare.setBackground(checkColor);
 				inCheck = true;
 			}
 		}
-		//Rows & Columns
-		for (int[] ro : rows){
-			conflictSquare = checkRecursive(row, column, ro[0], ro[1]);
-			if (conflictSquare != null && 
-				conflictSquare.getPiece().getSide() != piece.getSide() &&
-				(conflictSquare.getPiece() instanceof Rook || conflictSquare.getPiece() instanceof Queen)){
+		// Rows & Columns
+		for (int[] line : rowCols) {
+			conflictSquare = checkRecursive(row, column, line[0], line[1]);
+			if (conflictSquare != null
+					&& conflictSquare.getPiece().side != piece.side
+					&& (conflictSquare.getPiece() instanceof Rook || conflictSquare
+							.getPiece() instanceof Queen)) {
 				conflictSquare.setBackground(checkColor);
 				inCheck = true;
 			}
 		}
-		
+
 		return inCheck;
 	}
-	private Square checkRecursive(int row, int column, int rowAdjust, int columnAdjust){
-		
+
+	/**
+	 * Analogous to moveRecursive in Square. Adjustments should be 1, 0, or -1.
+	 * 
+	 * Worker method for the "check" testing methods.
+	 * 
+	 * @param row
+	 *            Originating Square's row.
+	 * @param column
+	 *            Originating Square's column.
+	 * @param rowAdjust
+	 *            Row adjustment.
+	 * @param columnAdjust
+	 *            Row adjustment.
+	 * @return Following Square if the move is valid.
+	 */
+	private Square checkRecursive(int row, int column, int rowAdjust,
+			int columnAdjust) {
+
 		Square square = null;
-		
+
 		int currentRow = row + rowAdjust;
 		int currentColumn = column + columnAdjust;
-		if(isValid(currentRow, currentColumn)){
-			if(grid[currentRow][currentColumn].getPiece() == null)
-				square = checkRecursive(currentRow, currentColumn, rowAdjust, columnAdjust);
+		if (isValid(currentRow, currentColumn)) {
+			if (grid[currentRow][currentColumn].getPiece() == null)
+				square = checkRecursive(currentRow, currentColumn, rowAdjust,
+						columnAdjust);
 			else
 				square = grid[currentRow][currentColumn];
 		}
 		return square;
 	}
 
-	private boolean testMove(Square origin, Square target){
+	/**
+	 * Tests whether the move results in check. A clone of the current board is
+	 * made and the proposed move is applied. If the resulting board has the
+	 * King in check, the move is rejected.
+	 * 
+	 * -- Consider bundling this in with getMoves().
+	 * 
+	 * @param origin
+	 *            Originating Square.
+	 * @param target
+	 *            Target Square.
+	 * @return true if the move does not result in a check.
+	 */
+	private boolean testMove(Square origin, Square target) {
 		boolean validity = true;
-		
-		Chessboard checkBoard = (Chessboard)this.clone();
-		checkBoard.movePiece(checkBoard.grid[origin.row][origin.column], checkBoard.grid[target.row][target.column]);
-		
-		if (checkBoard.testCheck(origin.getPiece().getSide()))
+
+		Chessboard checkBoard = (Chessboard) this.clone();
+		checkBoard.movePiece(checkBoard.grid[origin.row][origin.column],
+				checkBoard.grid[target.row][target.column]);
+
+		if (checkBoard.testCheck(origin.getPiece().side))
 			validity = false;
-		
+
 		return validity;
 	}
 
-	private Chessboard(Chessboard original){
-		for (int row = 0; row < 8; row++){
-			for (int column = 0; column < 8; column++){
-				this.grid[row][column] = (Square)original.grid[row][column].clone();
+	/**
+	 * Private constructor solely for the purpose of cloning.
+	 * 
+	 * @param original
+	 *            this board.
+	 */
+	private Chessboard(Chessboard original) {
+		for (int row = 0; row < 8; row++) {
+			for (int column = 0; column < 8; column++) {
+				this.grid[row][column] = (Square) original.grid[row][column]
+						.clone();
 			}
 		}
 	}
-	
-	public Chessboard clone(){
+
+	public Chessboard clone() {
 		return new Chessboard(this);
 	}
 
-	public String toString(){
+	public String toString() {
 		String output = "";
-		for (int row = 0; row < 8; row++){
-			for (int column = 0; column < 8; column ++){
+		for (int row = 0; row < 8; row++) {
+			for (int column = 0; column < 8; column++) {
 				String rep = "[";
-				if (grid[row][column].getPiece() != null){
+				if (grid[row][column].getPiece() != null) {
 					rep += grid[row][column].getPiece();
-				}
-				else rep += "  "+row+" "+","+" "+column+"   ";
+				} else
+					rep += "  " + row + " " + "," + " " + column + "   ";
 				rep += "] ";
 				output += rep;
 			}
@@ -623,16 +1019,25 @@ public class Chessboard extends JPanel implements Cloneable{
 		return output;
 	}
 
-	private void sleep(){
+	/**
+	 * Utility method
+	 */
+	private void sleep() {
 		sleep(1);
 	}
-	
-	private void sleep(int s){
+
+	/**
+	 * Utility method
+	 * 
+	 * @param s
+	 *            Duration of pause in seconds.
+	 */
+	private void sleep(int s) {
 		try {
 			Thread.sleep(s * 1000);
 		} catch (InterruptedException e) {
 			e.printStackTrace();
 		}
 	}
-	
+
 }
