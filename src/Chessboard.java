@@ -372,17 +372,18 @@ public class Chessboard extends JPanel implements Cloneable {
 			moves.add(new int[] { -2, 1 });
 			moves.add(new int[] { -2, -1 });
 
-			// Filtering valid Squares
+			// Filtering valid moves
 			ArrayList<Square> squares = new ArrayList<Square>();
 			for (int[] move : moves) {
-				if (isValid(row + move[0], column + move[1]))
-					squares.add(grid[row + move[0]][column + move[1]]);
-			}
-			// Filtering valid moves
-			for (int i = 0; i < squares.size(); i++) {
-				Square s = squares.get(i);
-				if (s.getPiece() != null && s.getPiece().side == piece.side)
-					squares.remove(s);
+				if (isValid(row + move[0], column + move[1])){
+					Square target = grid[row + move[0]][column + move[1]];
+					// Target square is empty
+					if (target.getPiece() == null)
+						squares.add(grid[row + move[0]][column + move[1]]);
+					// Target square holds an opposing piece
+					else if (target.getPiece().side != piece.side)
+						squares.add(grid[row + move[0]][column + move[1]]);
+				}
 			}
 
 			return squares;
@@ -702,6 +703,15 @@ public class Chessboard extends JPanel implements Cloneable {
 			if (testMove(square, destination)) {
 				selectionMoves.add(destination);
 				destination.setBackground(availableColor);
+				
+				// Highlight castling square
+				if (square.getPiece() instanceof King &&
+						!((Castleable)square.getPiece()).hasMoved() &&
+						destination.row == getBoardSide(square.getPiece().side)){
+					if (destination.column == 6 || destination.column == 2)
+						destination.setBackground(castleColor);
+				}
+				
 			}
 		}
 		// If the piece can't move, don't highlight it

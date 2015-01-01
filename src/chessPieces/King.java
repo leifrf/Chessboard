@@ -12,7 +12,6 @@ public class King extends ChessPiece implements Castleable{
 	}
 	
 	public void setMoved(){
-		System.out.println("King at time " + creationTime + " has moved.");
 		this.hasMoved = true;
 	}
 	
