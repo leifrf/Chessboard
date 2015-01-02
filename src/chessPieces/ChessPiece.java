@@ -11,25 +11,27 @@ public class ChessPiece implements Cloneable {
 	// Consider switching to ENUM
 	public static final int WHITE = -1;
 	public static final int BLACK = -2;
-	
+
 	public final int side;
 	public final int value;
 	private ImageIcon icon;
 	private String name;
 
 	/**
-	 * General constructor.
-	 * Creates a chess piece with the given value, name, and side.
-	 * Works directly with the folder res/ChessPieceImages.
+	 * General constructor. Creates a chess piece with the given value, name,
+	 * and side. Works directly with the folder res/ChessPieceImages.
 	 * 
-	 * Although it is possible to create a new chess piece, it will
-	 * not be validated by the game.
+	 * Although it is possible to create a new chess piece, it will not be
+	 * validated by the game.
 	 * 
 	 * Moves for the piece are determined in the Chessboard class.
 	 * 
-	 * @param value Value of the piece. i.e. Queen = 9.
-	 * @param name Name of the piece.
-	 * @param side ChessPiece.WHITE or ChessPiece.BLACK.
+	 * @param value
+	 *            Value of the piece. i.e. Queen = 9.
+	 * @param name
+	 *            Name of the piece.
+	 * @param side
+	 *            ChessPiece.WHITE or ChessPiece.BLACK.
 	 */
 	public ChessPiece(int value, String name, int side) {
 		this.value = value;
@@ -39,22 +41,24 @@ public class ChessPiece implements Cloneable {
 	}
 
 	/**
-	 * Creates the file path based on the name and side.
-	 * The imageIcon is taken from this generated path.
-	 * This is called once, in the constructor.
+	 * Creates the file path based on the name and side. The imageIcon is taken
+	 * from this generated path. This is called once, in the constructor.
 	 * 
-	 * @param name Name of the piece
-	 * @param side ChessPiece.WHITE or ChessPiece.BLACK
+	 * @param name
+	 *            Name of the piece
+	 * @param side
+	 *            ChessPiece.WHITE or ChessPiece.BLACK
 	 * @return
 	 */
-	private ImageIcon getIcon(String name, int side){
+	private ImageIcon getIcon(String name, int side) {
 		String sideName = "";
 		if (side == ChessPiece.WHITE)
 			sideName = "white";
 		else
 			sideName = "black";
 		// Parse path name
-		String path = "ChessPieceImages/" + name.toLowerCase() + "_" + sideName + ".png";
+		String path = "ChessPieceImages/" + name.toLowerCase() + "_" + sideName
+				+ ".png";
 		ImageIcon icon = null;
 		try {
 			// Load image from resources
@@ -65,10 +69,9 @@ public class ChessPiece implements Cloneable {
 		}
 		return icon;
 	}
-	
+
 	/**
-	 * Accessor for the piece's icon.
-	 * Icon is ~45px.
+	 * Accessor for the piece's icon. Icon is ~45px.
 	 * 
 	 * @return Piece's icon.
 	 */
@@ -77,9 +80,8 @@ public class ChessPiece implements Cloneable {
 	}
 
 	/**
-	 * Gives the string representation of the ChessPiece.
-	 * Returns side + piece name
-	 * i.e. "White Rook"
+	 * Gives the string representation of the ChessPiece. Returns side + piece
+	 * name i.e. "White Rook"
 	 */
 	public String toString() {
 		String team = "";
@@ -88,6 +90,17 @@ public class ChessPiece implements Cloneable {
 		else
 			team = "Black ";
 		return team + name;
+	}
+
+	public boolean equals(Object o) {
+		boolean equal = true;
+		ChessPiece piece = (ChessPiece) o;
+		if (this.value == piece.value && this.name == piece.name
+				&& this.side == piece.side)
+			equal = true;
+		else
+			equal = false;
+		return equal;
 	}
 
 	/**

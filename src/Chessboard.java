@@ -6,6 +6,7 @@ import java.awt.event.ActionListener;
 import java.awt.event.KeyEvent;
 import java.awt.event.KeyListener;
 import java.util.ArrayList;
+import java.util.Stack;
 
 import javax.swing.BorderFactory;
 import javax.swing.JButton;
@@ -47,7 +48,7 @@ public class Chessboard extends JPanel implements Cloneable {
 	// Colors used in the program
 	private Color selectColor = FIREBRICK;
 	private Color availableColor = DARK_ORANGE;
-	private Color castleColor = availableColor.brighter(); 
+	private Color castleColor = availableColor.brighter();
 	private Color checkColor = DARK_SLATE_BLUE;
 	// The currently selected square
 	private Square selection;
@@ -55,6 +56,9 @@ public class Chessboard extends JPanel implements Cloneable {
 	private ArrayList<Square> selectionMoves = new ArrayList<Square>();
 	// Whose turn it currently is
 	private boolean whiteTurn = true;
+	// Stack of moves for undo and En-Passant
+	// [0] is origin, [1] is target
+	Stack<Square[]> moveHistory = new Stack<Square[]>();
 
 	/**
 	 * Provides an example instance of the game.
@@ -72,6 +76,7 @@ public class Chessboard extends JPanel implements Cloneable {
 		frame.setLocationRelativeTo(null);
 	}
 
+	// -------------------------------------------------------------------------- Start of Building Board
 	/**
 	 * Default constructor Uses SIENNA and BEIGE colors
 	 */
@@ -94,8 +99,8 @@ public class Chessboard extends JPanel implements Cloneable {
 		initializeSide(ChessPiece.WHITE);
 		initializeSide(ChessPiece.BLACK);
 
-		// this.setFocusable(true);
-		// this.addKeyListener(new boardNavigator());
+//		this.setFocusable(true);
+//		this.addKeyListener(new boardNavigator());
 	}
 
 	/**
@@ -156,14 +161,9 @@ public class Chessboard extends JPanel implements Cloneable {
 		grid[boardSide][3].setPiece(new Queen(side));
 		grid[boardSide][4].setPiece(new King(side));
 	}
-
-	private int getBoardSide(int side){
-		int boardSide = 0;
-		if (side == ChessPiece.WHITE)
-			boardSide = 7;
-		return boardSide;
-	}
+	// -------------------------------------------------------------------------- End of Building Board
 	
+	// -------------------------------------------------------------------------- Start of Square Handling
 	/**
 	 * This is the primary component of the Chessboard. This class contains its
 	 * xy position in the grid, background color, and current piece. No two
@@ -273,30 +273,20 @@ public class Chessboard extends JPanel implements Cloneable {
 		}
 
 		/**
-		 * Equality is based on position and piece.
-		 * 
-		 * @return true if the Squares have the same position and piece.
-		 */
-		@Override
-		public boolean equals(Object compare) {
-			Square other = (Square) compare;
-			return other.getPiece() == this.piece && other.row == this.row
-					&& other.column == this.column;
-		}
-
-		/**
 		 * Returns an exact replica of this square.
 		 */
 		public Object clone() {
 			// This is really bad form.
 			// Every piece should be cloned in this process.
-			// Minimizing cloning is done solely to increase the speed of the program.
+			// Minimizing cloning is done solely to increase the speed of the
+			// program.
 			Square clonedSquare = new Square(this.bkg, this.row, this.column);
 			if (this.piece instanceof King || this.piece instanceof Rook)
-				clonedSquare.setPiece((ChessPiece)this.piece.clone());
+				clonedSquare.setPiece((ChessPiece) this.piece.clone());
 			else
 				clonedSquare.setPiece(this.piece);
-//			Square clonedSquare = new Square(this.bkg, this.piece, this.row, this.column);
+			// Square clonedSquare = new Square(this.bkg, this.piece, this.row,
+			// this.column);
 			return clonedSquare;
 		}
 
@@ -310,10 +300,7 @@ public class Chessboard extends JPanel implements Cloneable {
 			return "(" + row + ", " + column + ") " + piece;
 		}
 
-		/**
-		 * The below section contains the move logic for the game.
-		 */
-
+		// -------------------------------------------------------------------------- Start of Move Logic
 		/**
 		 * Checks whether the two numbers are between 0 and 7 inclusive. This is
 		 * to determine whether or not it is a valid index on the grid.
@@ -375,7 +362,7 @@ public class Chessboard extends JPanel implements Cloneable {
 			// Filtering valid moves
 			ArrayList<Square> squares = new ArrayList<Square>();
 			for (int[] move : moves) {
-				if (isValid(row + move[0], column + move[1])){
+				if (isValid(row + move[0], column + move[1])) {
 					Square target = grid[row + move[0]][column + move[1]];
 					// Target square is empty
 					if (target.getPiece() == null)
@@ -436,27 +423,52 @@ public class Chessboard extends JPanel implements Cloneable {
 			else
 				shift = -1;
 
+			int newRow = row + shift;
+
 			ArrayList<Square> moves = new ArrayList<Square>();
 			// Move forward 2 if on original row
 			if ((row == 1 && piece.side == ChessPiece.BLACK || row == 6
 					&& piece.side == ChessPiece.WHITE)
-					&& grid[row + shift][column].getPiece() == null
-					&& grid[row + shift * 2][column].getPiece() == null) {
-				moves.add(grid[row + shift * 2][column]);
+					&& grid[newRow][column].getPiece() == null
+					&& grid[newRow + shift][column].getPiece() == null) {
+				moves.add(grid[newRow + shift][column]);
 			}
 			// Move forward 1
-			if (grid[row + shift][column].getPiece() == null)
-				moves.add(grid[row + shift][column]);
-			// Take piece to one diagonal
-			if (isValid(row + shift, column + shift)
-					&& grid[row + shift][column + shift].getPiece() != null
-					&& grid[row + shift][column + shift].getPiece().side != piece.side)
-				moves.add(grid[row + shift][column + shift]);
-			// Take piece to the other diagonal
-			if (isValid(row + shift, column - shift)
-					&& grid[row + shift][column - shift].getPiece() != null
-					&& grid[row + shift][column - shift].getPiece().side != piece.side)
-				moves.add(grid[row + shift][column - shift]);
+			if (grid[newRow][column].getPiece() == null)
+				moves.add(grid[newRow][column]);
+
+			for (int newColumn : new int[] { column + shift, column - shift }) {
+				// Take piece on a diagonal
+				if (isValid(newRow, newColumn)
+						&& grid[newRow][newColumn].getPiece() != null
+						&& grid[newRow][newColumn].getPiece().side != piece.side)
+					moves.add(grid[newRow][newColumn]);
+			}
+
+			// En Passant to one diagonal
+			int enPassantRow = 0;
+			if (piece.side == ChessPiece.WHITE)
+				enPassantRow = 3;
+			else
+				enPassantRow = 4;
+
+			for (int newColumn : new int[] { column + shift, column - shift }) {
+				// Pawn in the correct row for En Passant
+				if (row == enPassantRow && isValid(row, newColumn)
+						&&
+						// Adjacent square contains a Black Pawn
+						grid[row][newColumn].getPiece() instanceof Pawn
+						&& grid[row][newColumn].getPiece().side != piece.side) {
+					Square[] lastMove = moveHistory.peek();
+					Square origin = lastMove[0];
+					Square target = lastMove[1];
+					// Black Pawn moved forward 2 on the last move
+					if (Math.abs(origin.row - target.row) == 2
+							&& origin.getPiece().equals(
+									grid[row][newColumn].getPiece()))
+						moves.add(grid[newRow][newColumn]);
+				}
+			}
 			return moves;
 		}
 
@@ -480,12 +492,12 @@ public class Chessboard extends JPanel implements Cloneable {
 					}
 				}
 			}
-			
+
 			if (testKingSideCastle(this.piece.side))
 				moves.add(grid[getBoardSide(this.piece.side)][6]);
 			if (testQueenSideCastle(this.piece.side))
 				moves.add(grid[getBoardSide(this.piece.side)][2]);
-			
+
 			return moves;
 		}
 
@@ -550,7 +562,7 @@ public class Chessboard extends JPanel implements Cloneable {
 			}
 			return moves;
 		}
-
+		// -------------------------------------------------------------------------- End of Move Logic
 	}
 
 	/**
@@ -568,13 +580,14 @@ public class Chessboard extends JPanel implements Cloneable {
 		@Override
 		public void actionPerformed(ActionEvent e) {
 			Square square = (Square) e.getSource();
+
 			int currentSide;
 			if (whiteTurn) {
 				currentSide = ChessPiece.WHITE;
 			} else {
 				currentSide = ChessPiece.BLACK;
 			}
-			
+
 			// Selecting the piece
 			if (selection == null && square.getPiece() != null
 					&& square.getPiece().side == currentSide) {
@@ -584,16 +597,20 @@ public class Chessboard extends JPanel implements Cloneable {
 			}
 			// Moving the piece
 			else if (selectionMoves.contains(square)) {
-				// Castling will have been filtered by this point
-				// square is a valid move
-				if (selection.getPiece() instanceof King &&
-						!((Castleable)selection.getPiece()).hasMoved() &&
-						square.row == getBoardSide(currentSide)){
+				// Castling handler
+				if (selection.getPiece() instanceof King
+						&& !((Castleable) selection.getPiece()).hasMoved()
+						&& square.row == getBoardSide(currentSide)) {
 					if (square.column == 6)
 						kingSideCastle(currentSide);
 					else if (square.column == 2)
 						queenSideCastle(currentSide);
+				} else if (selection.getPiece() instanceof Pawn
+						&& square.getPiece() == null) {
+					enPassant(selection, square);
 				}
+
+				// Standard move
 				else
 					movePiece(selection, square);
 				deselectSquare(selection);
@@ -611,82 +628,10 @@ public class Chessboard extends JPanel implements Cloneable {
 	}
 
 	// In progress for a later version
-	private class boardNavigator implements KeyListener {
+	// -------------------------------------------------------------------------- End of Square Handling
 
-		private int[] index = new int[] { 0, 0 };
-		// initialized to impossible value
-		private int[] newIndex = new int[] { 0, 0 };
 
-		@Override
-		public void keyPressed(KeyEvent e) {
-			int key = e.getKeyCode();
-			String keyName = "";
-			if (key == KeyEvent.VK_UP)
-				newIndex[0] = index[0] - 1;
-			else if (key == KeyEvent.VK_LEFT)
-				newIndex[1] = index[1] - 1;
-			else if (key == KeyEvent.VK_RIGHT)
-				newIndex[1] = index[1] + 1;
-			else if (key == KeyEvent.VK_DOWN)
-				newIndex[0] = index[0] + 1;
-			else if (key == KeyEvent.VK_ENTER)
-				grid[index[0]][index[1]].doClick();
-
-			if (isValid(newIndex[0], newIndex[1])) {
-				index[0] = newIndex[0];
-				index[1] = newIndex[1];
-			}
-
-			if (keyName != "")
-				System.out.println("Pressed " + keyName);
-		}
-
-		@Override
-		public void keyReleased(KeyEvent e) {
-			// System.out.println("Key released.");
-		}
-
-		@Override
-		public void keyTyped(KeyEvent e) {
-			// System.out.println("Key typed.");
-		}
-
-	}
-
-	/**
-	 * Determines whether the given side has check mated their opponent.
-	 * 
-	 * @param side
-	 *            ChessPiece.WHITE or ChessPiece.BLACK
-	 * @return true if the given side has achieved a check mate.
-	 */
-	private boolean victory(int side) {
-
-		boolean gameOver = false;
-
-		Color winnerColour = null;
-		int otherSide;
-		// Getting the proper sides
-		if (side == ChessPiece.WHITE) {
-			winnerColour = Color.WHITE;
-			otherSide = ChessPiece.BLACK;
-		} else {
-			winnerColour = Color.BLACK;
-			otherSide = ChessPiece.WHITE;
-		}
-		// Testing check the checkMate
-		// Consider refactoring to only test checkMate here
-		if (testCheck(otherSide)) {
-			gameOver = testCheckMate(otherSide);
-		}
-		// Set border to indicate check mate to user
-		if (gameOver) {
-			Border b = BorderFactory.createLineBorder(winnerColour, 10);
-			this.setBorder(b);
-		}
-		return gameOver;
-	}
-
+	// -------------------------------------------------------------------------- Start of Selection Handling
 	/**
 	 * Selects the clicked square. This method uses the global variables:
 	 * selection, selectionMoves
@@ -703,15 +648,15 @@ public class Chessboard extends JPanel implements Cloneable {
 			if (testMove(square, destination)) {
 				selectionMoves.add(destination);
 				destination.setBackground(availableColor);
-				
+
 				// Highlight castling square
-				if (square.getPiece() instanceof King &&
-						!((Castleable)square.getPiece()).hasMoved() &&
-						destination.row == getBoardSide(square.getPiece().side)){
+				if (square.getPiece() instanceof King
+						&& !((Castleable) square.getPiece()).hasMoved()
+						&& destination.row == getBoardSide(square.getPiece().side)) {
 					if (destination.column == 6 || destination.column == 2)
 						destination.setBackground(castleColor);
 				}
-				
+
 			}
 		}
 		// If the piece can't move, don't highlight it
@@ -750,9 +695,12 @@ public class Chessboard extends JPanel implements Cloneable {
 	 *            Target square.
 	 */
 	protected void movePiece(Square origin, Square target) {
-		
-//		System.out.println("Moving " + origin + " to " + target);
-		
+
+		// System.out.println("Moving " + origin + " to " + target);
+
+		moveHistory.add(new Square[] { (Square) origin.clone(),
+				(Square) target.clone() });
+
 		ChessPiece piece = origin.getPiece();
 		// Checking Castleable
 		if (piece instanceof Castleable)
@@ -761,13 +709,43 @@ public class Chessboard extends JPanel implements Cloneable {
 		origin.setPiece(null);
 	}
 
-	/**
-	 * Analogous to isValid in Square.
-	 */
-	private boolean isValid(int row, int column) {
-		return row < 8 && column < 8 && row > -1 && column > -1;
-	}
+	// -------------------------------------------------------------------------- End of Selection Handling
+	
+	// -------------------------------------------------------------------------- Start of Check Handling
 
+	/**
+	 * Determines whether the given side has check mated their opponent.
+	 * 
+	 * @param side
+	 *            ChessPiece.WHITE or ChessPiece.BLACK
+	 * @return true if the given side has achieved a check mate.
+	 */
+	private boolean victory(int side) {
+		
+		boolean gameOver = false;
+		
+		Color winnerColour = null;
+		int otherSide;
+		// Getting the proper sides
+		if (side == ChessPiece.WHITE) {
+			winnerColour = Color.WHITE;
+			otherSide = ChessPiece.BLACK;
+		} else {
+			winnerColour = Color.BLACK;
+			otherSide = ChessPiece.WHITE;
+		}
+		// Testing check the checkMate
+		// Consider refactoring to only test checkMate here
+		if (testCheck(otherSide)) {
+			gameOver = testCheckMate(otherSide);
+		}
+		// Set border to indicate check mate to user
+		if (gameOver) {
+			Border b = BorderFactory.createLineBorder(winnerColour, 10);
+			this.setBorder(b);
+		}
+		return gameOver;
+	}
 	/**
 	 * Tests whether the given side has been check mated. Check mate is defined
 	 * such that there are no possible moves for the given side that do not
@@ -835,12 +813,14 @@ public class Chessboard extends JPanel implements Cloneable {
 			s.setBackground(checkColor);
 		if (threats.size() != 0)
 			inCheck = true;
-		
+
 		return inCheck;
-		
+
 	}
+	// -------------------------------------------------------------------------- End of Check Handling
 	
-	private ArrayList<Square> getThreats(Square target, int side){
+	// -------------------------------------------------------------------------- Start of Threat Handling
+	private ArrayList<Square> getThreats(Square target, int side) {
 		ArrayList<Square> threats = new ArrayList<Square>();
 		threats.addAll(knightThreat(target, side));
 		threats.addAll(pawnThreat(target, side));
@@ -907,7 +887,7 @@ public class Chessboard extends JPanel implements Cloneable {
 	private ArrayList<Square> pawnThreat(Square target, int side) {
 
 		ArrayList<Square> validCaptures = new ArrayList<Square>();
-		
+
 		int adjust;
 		// Getting direction
 		if (side == ChessPiece.WHITE)
@@ -917,19 +897,18 @@ public class Chessboard extends JPanel implements Cloneable {
 		// Getting both possible moves
 		Square square1 = null;
 		if (isValid(target.row + adjust, target.column + adjust))
-			square1 = grid[target.row + adjust][target.column
-					+ adjust];
+			square1 = grid[target.row + adjust][target.column + adjust];
 		Square square2 = null;
 		if (isValid(target.row + adjust, target.column - adjust))
-			square2 = grid[target.row + adjust][target.column
-					- adjust];
+			square2 = grid[target.row + adjust][target.column - adjust];
 
-
-		if (square1.getPiece() instanceof Pawn && square1.getPiece().side != side)
+		if (square1.getPiece() instanceof Pawn
+				&& square1.getPiece().side != side)
 			validCaptures.add(square1);
-		if (square2.getPiece() instanceof Pawn && square2.getPiece().side != side)
+		if (square2.getPiece() instanceof Pawn
+				&& square2.getPiece().side != side)
 			validCaptures.add(square2);
-		
+
 		return validCaptures;
 	}
 
@@ -947,11 +926,11 @@ public class Chessboard extends JPanel implements Cloneable {
 
 		int row = kingPosition.row;
 		int column = kingPosition.column;
-		
+
 		Square conflictSquare = null;
 
 		ArrayList<Square> squares = new ArrayList<Square>();
-		
+
 		// Possible lines
 		int[][] diagonals = new int[][] { new int[] { 1, 1 },
 				new int[] { 1, -1 }, new int[] { -1, 1 }, new int[] { -1, -1 } };
@@ -1013,6 +992,101 @@ public class Chessboard extends JPanel implements Cloneable {
 		return square;
 	}
 
+	// -------------------------------------------------------------------------- End of Threat Handling
+	
+	// -------------------------------------------------------------------------- Start of Castling Handling
+	/**
+	 * Castling follows this logic: 1. Neither the king nor the chosen rook have
+	 * been previously moved 2. There are no pieces between the king and the
+	 * chosen rook. 3. The king is not currently in check. 4. The king does not
+	 * pass through a square that is attacked by an enemy piece.
+	 * 
+	 * @param side
+	 *            ChessPiece.WHITE or ChessPiece.BLACK
+	 * @return true if move is possible.
+	 */
+	private boolean testKingSideCastle(int side) {
+
+		int boardSide = getBoardSide(side);
+
+		ChessPiece king = grid[boardSide][4].getPiece();
+		ChessPiece rook = grid[boardSide][7].getPiece();
+
+		// King is castleable
+		boolean kingValid = king instanceof King && king.side == side
+				&& !((Castleable) king).hasMoved() && !testCheck(side);
+		// Rook is castleable
+		boolean rookValid = rook instanceof Rook && rook.side == side
+				&& !((Castleable) rook).hasMoved();
+		// No square between the King and the Rook is threatened
+		boolean betweenValid = grid[boardSide][5].getPiece() == null
+				&& getThreats(grid[boardSide][5], side).size() == 0
+				&& grid[boardSide][6].getPiece() == null
+				&& getThreats(grid[boardSide][6], side).size() == 0;
+
+		return kingValid && rookValid && betweenValid;
+	}
+	/**
+	 * Castling follows this logic: 1. Neither the king nor the chosen rook have
+	 * been previously moved 2. There are no pieces between the king and the
+	 * chosen rook. 3. The king is not currently in check. 4. The king does not
+	 * pass through a square that is attacked by an enemy piece.
+	 * 
+	 * @param side
+	 *            ChessPiece.WHITE or ChessPiece.BLACK
+	 * @return true if move is possible.
+	 */
+	private boolean testQueenSideCastle(int side) {
+
+		int boardSide = getBoardSide(side);
+
+		ChessPiece king = grid[boardSide][4].getPiece();
+		ChessPiece rook = grid[boardSide][0].getPiece();
+
+		// King is castleable
+		boolean kingValid = king instanceof King && king.side == side
+				&& !((Castleable) king).hasMoved() && !testCheck(side);
+		// Rook is castleable
+		boolean rookValid = rook instanceof Rook && rook.side == side
+				&& !((Castleable) rook).hasMoved();
+		// No square between the King and the Rook is threatened
+		boolean betweenValid = grid[boardSide][3].getPiece() == null
+				&& getThreats(grid[boardSide][3], side).size() == 0
+				&& grid[boardSide][2].getPiece() == null
+				&& getThreats(grid[boardSide][2], side).size() == 0;
+
+		return kingValid && rookValid && betweenValid;
+	}
+	/**
+	 * It is important that the rook move before the king.
+	 * 
+	 * @param side
+	 */
+	private void kingSideCastle(int side) {
+
+		System.out.println("Castling King Side");
+
+		int boardSide = getBoardSide(side);
+
+		movePiece(grid[boardSide][7], grid[boardSide][5]);
+		movePiece(grid[boardSide][4], grid[boardSide][6]);
+	}
+
+	/**
+	 * It is important that the rook move before the king.
+	 * 
+	 * @param side
+	 */
+	private void queenSideCastle(int side) {
+		int boardSide = getBoardSide(side);
+
+		movePiece(grid[boardSide][0], grid[boardSide][3]);
+		movePiece(grid[boardSide][4], grid[boardSide][2]);
+	}
+	// -------------------------------------------------------------------------- End of Castling Handling
+
+
+	
 	/**
 	 * Tests whether the move results in check. A clone of the current board is
 	 * made and the proposed move is applied. If the resulting board has the
@@ -1040,81 +1114,88 @@ public class Chessboard extends JPanel implements Cloneable {
 	}
 
 	/**
-	 * Castling follows this logic:
-	 * 1. Neither the king nor the chosen rook have been previously moved
-	 * 2. There are no pieces between the king and the chosen rook.
-	 * 3. The king is not currently in check.
-	 * 4. The king does not pass through a square that is attacked by an enemy piece.
-	 * @param side
-	 * @return
+	 * Performs the enPassant move. The logic is as follows: 1. The capturing
+	 * pawn is on the 3rd row if White, 4th row if Black. 2. The captured pawn
+	 * is on a column-adjacent square 3. The opponent's last move was to move
+	 * the captured pawn forward two squares
+	 * 
+	 * @param origin
+	 *            Capturing pawn.
+	 * @param target
+	 *            Empty square behind the captured pawn.
 	 */
-	private boolean testKingSideCastle(int side){
+	private void enPassant(Square origin, Square target) {
 
-		int boardSide = getBoardSide(side);
-		
-		ChessPiece king = grid[boardSide][4].getPiece();
-		ChessPiece rook = grid[boardSide][7].getPiece();
-		
-		// King is castleable
-		boolean kingValid = king instanceof King &&
-							king.side == side &&
-							!((Castleable)king).hasMoved() &&
-							!testCheck(side);
-		// Rook is castleable
-		boolean rookValid = rook instanceof Rook &&
-							rook.side == side &&
-							!((Castleable)rook).hasMoved();
-		// No square between the King and the Rook is threatened
-		boolean betweenValid = grid[boardSide][5].getPiece() == null &&  
-							   getThreats(grid[boardSide][5], side).size() == 0 &&
-							   grid[boardSide][6].getPiece() == null && 
-							   getThreats(grid[boardSide][6], side).size() == 0;
-		
-		return kingValid && rookValid && betweenValid;
+		movePiece(origin, target);
+
+		// This "impossible" scenario is occasionally being fired.
+		// It is not producing errors, but should be investigated
+		// if (!(grid[origin.row][target.column].getPiece() instanceof Pawn))
+		// System.out.println("Error: Performing En Passant on non-Pawn piece.");
+
+		grid[origin.row][target.column].setPiece(null);
+
 	}
 	
-	private boolean testQueenSideCastle(int side){
-		
-		int boardSide = getBoardSide(side);
-		
-		ChessPiece king = grid[boardSide][4].getPiece();
-		ChessPiece rook = grid[boardSide][0].getPiece();
-		
-		// King is castleable
-		boolean kingValid = king instanceof King &&
-							king.side == side &&
-							!((Castleable)king).hasMoved() &&
-							!testCheck(side);
-		// Rook is castleable
-		boolean rookValid = rook instanceof Rook &&
-							rook.side == side &&
-							!((Castleable)rook).hasMoved();
-		// No square between the King and the Rook is threatened
-		boolean betweenValid = grid[boardSide][3].getPiece() == null && 
-							   getThreats(grid[boardSide][3], side).size() == 0 &&
-							   grid[boardSide][2].getPiece() == null &&
-							   getThreats(grid[boardSide][2], side).size() == 0;
-		
-		return kingValid && rookValid && betweenValid;
+	/**
+	 * Returns the row index for the corresponding side.
+	 * @param side ChessPiece.WHITE or ChessPiece.BLACK
+	 * @return 0 for Black, 7 for White.
+	 */
+	private int getBoardSide(int side) {
+		int boardSide = 0;
+		if (side == ChessPiece.WHITE)
+			boardSide = 7;
+		return boardSide;
+	}
+	/**
+	 * Analogous to isValid in Square.
+	 */
+	private boolean isValid(int row, int column) {
+		return row < 8 && column < 8 && row > -1 && column > -1;
 	}
 	
-	private void kingSideCastle(int side){
-		
-		System.out.println("Castling King Side");
-		
-		int boardSide = getBoardSide(side);
-		
-		movePiece(grid[boardSide][4], grid[boardSide][6]);
-		movePiece(grid[boardSide][7], grid[boardSide][5]);
+	/**
+	 * Undoes the last move made. Implements a Stack and pops the top move.
+	 * Moves are stored as an array of 2 Squares, the origin and target.
+	 * 
+	 * If there are no moves to undo, nothing happens.
+	 */
+	public void undo() {
+		if (!moveHistory.isEmpty()) {
+			Square[] move = moveHistory.pop();
+			Square origin = move[0];
+			Square target = move[1];
+
+			grid[origin.row][origin.column].setPiece(origin.getPiece());
+			grid[target.row][target.column].setPiece(target.getPiece());
+
+			// Detecting castling
+			// Assumes that King was moved after Rook during castling
+			if (origin.getPiece() instanceof King
+					&& Math.abs(origin.column - target.column) == 2) {
+				whiteTurn = !whiteTurn;
+				undo();
+			}
+			// Detecting En Passant
+			else if (origin.getPiece() instanceof Pawn
+					&& target.getPiece() == null
+					&&
+					// Moved diagonally
+					Math.abs(origin.column - target.column) == 1
+					&& Math.abs(origin.row - target.row) == 1) {
+				System.out.println("Undoing En Passant.");
+				int otherSide = ChessPiece.WHITE;
+				if (origin.getPiece().side == ChessPiece.WHITE)
+					otherSide = ChessPiece.BLACK;
+				grid[origin.row][target.column].setPiece(new Pawn(otherSide));
+			}
+
+			whiteTurn = !whiteTurn;
+		}
 	}
-	
-	private void queenSideCastle(int side){
-		int boardSide = getBoardSide(side);
-		
-		movePiece(grid[boardSide][4], grid[boardSide][2]);
-		movePiece(grid[boardSide][0], grid[boardSide][3]);		
-	}
-	
+
+	// -------------------------------------------------------------------------- Start of Utility Methods
 	/**
 	 * Private constructor solely for the purpose of cloning.
 	 * 
@@ -1171,5 +1252,6 @@ public class Chessboard extends JPanel implements Cloneable {
 			e.printStackTrace();
 		}
 	}
-
+	// -------------------------------------------------------------------------- End of Utility Methods
+	
 }
