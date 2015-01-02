@@ -3,8 +3,6 @@ import java.awt.Dimension;
 import java.awt.GridLayout;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
-import java.awt.event.KeyEvent;
-import java.awt.event.KeyListener;
 import java.util.ArrayList;
 import java.util.Stack;
 
@@ -40,11 +38,11 @@ public class Chessboard extends JPanel implements Cloneable {
 	// The squares in the game
 	private Square[][] grid = new Square[8][8];
 	// Color references
-	private static final Color BEIGE = new Color(245, 245, 220);
-	private static final Color SIENNA = new Color(160, 82, 45);
-	private static final Color FIREBRICK = new Color(178, 34, 34);
-	private static final Color DARK_ORANGE = new Color(255, 140, 0);
-	private static final Color DARK_SLATE_BLUE = new Color(72, 61, 139);
+	private static final Color SIENNA = new Color(160, 82, 45); // Color1
+	private static final Color BEIGE = new Color(245, 245, 220); // Color2
+	private static final Color FIREBRICK = new Color(178, 34, 34); // Selected
+	private static final Color DARK_ORANGE = new Color(255, 140, 0); // Available, brighter for Castling
+	private static final Color DARK_SLATE_BLUE = new Color(72, 61, 139); // Check
 	// Colors used in the program
 	private Color selectColor = FIREBRICK;
 	private Color availableColor = DARK_ORANGE;
@@ -99,9 +97,8 @@ public class Chessboard extends JPanel implements Cloneable {
 		initializeSide(ChessPiece.WHITE);
 		initializeSide(ChessPiece.BLACK);
 
-//		this.setFocusable(true);
-//		this.addKeyListener(new boardNavigator());
 	}
+	
 
 	/**
 	 * Populates the grid of Squares and sets their colors. Attaches a
@@ -615,6 +612,9 @@ public class Chessboard extends JPanel implements Cloneable {
 					movePiece(selection, square);
 				deselectSquare(selection);
 
+				// Reseting colors
+				resetBoardColors();
+				
 				// Testing for end of game
 				if (whiteTurn)
 					victory(ChessPiece.WHITE);
@@ -626,8 +626,6 @@ public class Chessboard extends JPanel implements Cloneable {
 		}
 
 	}
-
-	// In progress for a later version
 	// -------------------------------------------------------------------------- End of Square Handling
 
 
@@ -1085,7 +1083,6 @@ public class Chessboard extends JPanel implements Cloneable {
 	}
 	// -------------------------------------------------------------------------- End of Castling Handling
 
-
 	
 	/**
 	 * Tests whether the move results in check. A clone of the current board is
@@ -1196,6 +1193,15 @@ public class Chessboard extends JPanel implements Cloneable {
 	}
 
 	// -------------------------------------------------------------------------- Start of Utility Methods
+	/**
+	 * Reverts square colors to original color.
+	 */
+	private void resetBoardColors(){
+		for (Square[] squares : grid)
+			for (Square s : squares)
+				s.resetBackground();
+	}
+	
 	/**
 	 * Private constructor solely for the purpose of cloning.
 	 * 
