@@ -31,10 +31,17 @@ public class ChessGame {
 		chessFrame.setLocationRelativeTo(null);
 	}
 
-	private class UndoListener implements ActionListener {
+	private class MenuListener implements ActionListener {
 		@Override
 		public void actionPerformed(ActionEvent e) {
-			board.undo();
+			String sourceName = ((JMenuItem)e.getSource()).getText();
+			if (sourceName.equals("Undo"))
+				board.undo();
+			else if (sourceName.equals("Save"))
+				System.out.println("Saving.");
+			else if (sourceName.equals("New Game")){
+				System.out.println("New Game.");
+			}
 		}
 	}
 
@@ -43,13 +50,27 @@ public class ChessGame {
 		
 		private JMenu menu = new JMenu("File");
 		private JMenuItem undo = new JMenuItem("Undo");
+		private JMenuItem save = new JMenuItem("Save");
+		private JMenuItem newGame = new JMenuItem("New Game");
+		private MenuListener listener = new MenuListener();
 		
 		protected ChessMenu(){
 			add(menu);
+			
 			menu.add(undo);
 			undo.setAccelerator(KeyStroke.
 					getKeyStroke(KeyEvent.VK_Z, ActionEvent.CTRL_MASK));
-			undo.addActionListener(new UndoListener());
+			undo.addActionListener(listener);
+			
+			menu.add(save);
+			save.setAccelerator(KeyStroke.
+					getKeyStroke(KeyEvent.VK_S, ActionEvent.CTRL_MASK));
+			save.addActionListener(listener);
+			
+			menu.add(newGame);
+			newGame.setAccelerator(KeyStroke.
+					getKeyStroke(KeyEvent.VK_N, ActionEvent.CTRL_MASK));
+			newGame.addActionListener(listener);
 		}
 	}
 

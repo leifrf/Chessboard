@@ -1,0 +1,26 @@
+Perhaps take an analytics approach.
+
+Redesign the board to be two grids: one is 8x8 ChessPiece, the other is the Squares.
+
+Whenever the board is changed, it is scanned and all information is updated.
+The moves of all pieces are determined just by looking at a given board. This can be refined by knowing whose turn it is.
+
+The set of squares becomes purely a cosmetic feature. After any board change, an updateDisplay() method would be called,
+which would reflect the current status of the board.
+
+Squares have settings for if it contains a checking piece, an available move, it is the current selection, etc...
+This would handle the coloring.
+
+The result of this is two-fold:
+1) Much faster computation & propagation ability.
+2) Ability to analyze board properties.
+
+This could be used to study chess much more intently. i.e. The following properties:
+- Number of pieces a given piece threatens
+- Number of squares a given piece threatens
+- Heatmap of square coverage for each side; the number of times a square is covered by a side
+
+Add an info interface.
+When the user interacts (some kind of click) with a certain cell, they should be able to get:
+- The piece(s) that threaten the cell
+* Make it a mouseover instead?

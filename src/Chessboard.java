@@ -25,8 +25,6 @@ import chessPieces.Rook;
  * This is a simple chess game. It follows the normal rules. For a full version
  * of the rules, consult Wikipedia.
  * 
- * Castling and En-Passant are not currently supported.
- * 
  * This version does not support an AI.
  * 
  * @author Leif Raptis-Firth
@@ -54,9 +52,9 @@ public class Chessboard extends JPanel implements Cloneable {
 	private ArrayList<Square> selectionMoves = new ArrayList<Square>();
 	// Whose turn it currently is
 	private boolean whiteTurn = true;
-	// Stack of moves for undo and En-Passant
+	// Stack of moves for undo and En Passant
 	// [0] is origin, [1] is target
-	Stack<Square[]> moveHistory = new Stack<Square[]>();
+	private Stack<Square[]> moveHistory = new Stack<Square[]>();
 
 	/**
 	 * Provides an example instance of the game.
@@ -577,7 +575,7 @@ public class Chessboard extends JPanel implements Cloneable {
 		@Override
 		public void actionPerformed(ActionEvent e) {
 			Square square = (Square) e.getSource();
-
+			
 			int currentSide;
 			if (whiteTurn) {
 				currentSide = ChessPiece.WHITE;
@@ -602,14 +600,20 @@ public class Chessboard extends JPanel implements Cloneable {
 						kingSideCastle(currentSide);
 					else if (square.column == 2)
 						queenSideCastle(currentSide);
-				} else if (selection.getPiece() instanceof Pawn
-						&& square.getPiece() == null) {
+				} 
+				if (selection.getPiece() instanceof Pawn
+						&& square.getPiece() == null
+						&& grid[selection.row][square.column].getPiece() instanceof Pawn
+						&& grid[selection.row][square.column].getPiece().side != selection.getPiece().side) {
+					System.out.println("Performing enPassant.");
 					enPassant(selection, square);
 				}
 
 				// Standard move
-				else
+				else{
+					System.out.println("Performing standard move.");
 					movePiece(selection, square);
+				}
 				deselectSquare(selection);
 
 				// Reseting colors
@@ -694,7 +698,7 @@ public class Chessboard extends JPanel implements Cloneable {
 	 */
 	protected void movePiece(Square origin, Square target) {
 
-		// System.out.println("Moving " + origin + " to " + target);
+//		System.out.println("Moving " + origin + " to " + target);
 
 		moveHistory.add(new Square[] { (Square) origin.clone(),
 				(Square) target.clone() });
@@ -1190,6 +1194,16 @@ public class Chessboard extends JPanel implements Cloneable {
 
 			whiteTurn = !whiteTurn;
 		}
+		
+		// Reseting colors
+		resetBoardColors();
+		
+		// Testing for end of game
+		if (!whiteTurn)
+			victory(ChessPiece.WHITE);
+		else
+			victory(ChessPiece.BLACK);
+
 	}
 
 	// -------------------------------------------------------------------------- Start of Utility Methods
